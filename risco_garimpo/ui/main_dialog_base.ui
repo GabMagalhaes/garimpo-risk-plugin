@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RiscoGarimpoDialogBase</class>
+<widget class="QDialog" name="RiscoGarimpoDialogBase">
+<property name="geometry"><rect><x>0</x><y>0</y><width>820</width><height>720</height></rect></property>
+<property name="windowTitle"><string>Risco Garimpo — Modelo Dinâmico</string></property>
+<layout class="QVBoxLayout" name="layoutPrincipal">
+<item>
+<widget class="QTabWidget" name="abas">
+<property name="currentIndex"><number>0</number></property>
+<widget class="QWidget" name="abaInsumos">
+<attribute name="title"><string>Insumos</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaInsumos">
+<item>
+<widget class="QGroupBox" name="grupoRasters">
+<property name="title"><string>Rasters de entrada</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoRasters">
+<item>
+<widget class="QLabel" name="nota_grupoRasters">
+<property name="text"><string>Todas as camadas são levadas à grade de trabalho antes de qualquer cálculo — projeção, origem e resolução idênticas.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoRasters">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboK">
+<property name="text"><string>K — capacidade de suporte (favorabilidade estática)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Raster do modelo estático. K exclui μ: o garimpo pretérito entra no estado e no contágio, nunca em K.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboK">
+<property name="toolTip"><string>Raster do modelo estático. K exclui μ: o garimpo pretérito entra no estado e no contágio, nunca em K.</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboMu0">
+<property name="text"><string>μ₀ — estado inicial (garimpo existente)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Fração ocupada por pixel na data inicial, na mesma unidade de K.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboMu0">
+<property name="toolTip"><string>Fração ocupada por pixel na data inicial, na mesma unidade de K.</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_comboMascara">
+<property name="text"><string>Máscara da área de estudo (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Valores &gt; 0 delimitam a área simulada.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QComboBox" name="comboMascara">
+<property name="toolTip"><string>Valores &gt; 0 delimitam a área simulada.</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoGrade">
+<property name="title"><string>Grade de trabalho</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoGrade">
+<item>
+<layout class="QFormLayout" name="form_grupoGrade">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0" colspan="2">
+<widget class="QCheckBox" name="checkReprojetar">
+<property name="text"><string>Reprojetar para outro CRS</string></property>
+<property name="toolTip"><string>O modelo exige CRS projetado (metros).</string></property>
+<property name="checked"><bool>false</bool></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_lineCrs">
+<property name="text"><string>CRS de destino</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Código EPSG, por exemplo EPSG:31981 (SIRGAS 2000 / UTM 21S).</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="lineCrs">
+<property name="toolTip"><string>Código EPSG, por exemplo EPSG:31981 (SIRGAS 2000 / UTM 21S).</string></property>
+<property name="text"><string>EPSG:31981</string></property>
+</widget>
+</item>
+<item row="2" column="0" colspan="2">
+<widget class="QCheckBox" name="checkResolucao">
+<property name="text"><string>Reamostrar a resolução de trabalho</string></property>
+<property name="toolTip"><string>Resoluções mais grossas aceleram e reduzem memória, ao custo de resolver pior a escala de 380 m.</string></property>
+<property name="checked"><bool>false</bool></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinResolucao">
+<property name="text"><string>Resolução de trabalho</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Tamanho do pixel da simulação.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QDoubleSpinBox" name="spinResolucao">
+<property name="toolTip"><string>Tamanho do pixel da simulação.</string></property>
+<property name="decimals"><number>1</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>5000.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>100.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_lineGradeInfo">
+<property name="text"><string>Grade resultante</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Atualizada ao escolher o raster K.</string></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QLineEdit" name="lineGradeInfo">
+<property name="toolTip"><string>Atualizada ao escolher o raster K.</string></property>
+<property name="placeholderText"><string>—</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoAlertas">
+<property name="title"><string>Alertas (ativação)</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoAlertas">
+<item>
+<layout class="QFormLayout" name="form_grupoAlertas">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboAlertas">
+<property name="text"><string>Camada de alertas (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboAlertas">
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboCampoAlertas">
+<property name="text"><string>Campo de data</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboCampoAlertas">
+</widget>
+</item>
+<item row="2" column="0" colspan="2">
+<widget class="QCheckBox" name="checkFrentes">
+<property name="text"><string>Agrupar alertas em frentes</string></property>
+<property name="toolTip"><string>~85% dos alertas têm vizinho a menos de 100 m: o alerta isolado é fragmento de detecção, não evento independente.</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinRaioFrente">
+<property name="text"><string>Raio de agrupamento</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Ligação simples entre alertas.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QDoubleSpinBox" name="spinRaioFrente">
+<property name="toolTip"><string>Ligação simples entre alertas.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>5000.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>100.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoFisc">
+<property name="title"><string>Fiscalização (supressão)</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoFisc">
+<item>
+<layout class="QFormLayout" name="form_grupoFisc">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboFisc">
+<property name="text"><string>Camada de autos de infração (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboFisc">
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboCampoFisc">
+<property name="text"><string>Campo de data</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboCampoFisc">
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoSub">
+<property name="title"><string>Sub-bacias (unidade de saída)</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSub">
+<item>
+<widget class="QLabel" name="nota_grupoSub">
+<property name="text"><string>A sub-bacia é unidade de reporte, nunca de propagação: a agregação ocorre depois de simular.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoSub">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboSubbacias">
+<property name="text"><string>Camada de sub-bacias (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboSubbacias">
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboCampoIdSub">
+<property name="text"><string>Campo identificador</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboCampoIdSub">
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaInsumos"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaParametros">
+<attribute name="title"><string>Parâmetros</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaParametros">
+<item>
+<widget class="QGroupBox" name="grupoPeriodo">
+<property name="title"><string>Período e integração</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoPeriodo">
+<item>
+<layout class="QFormLayout" name="form_grupoPeriodo">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_dateInicio">
+<property name="text"><string>Data inicial</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDateEdit" name="dateInicio">
+<property name="calendarPopup"><bool>true</bool></property>
+<property name="displayFormat"><string>dd/MM/yyyy</string></property>
+<property name="date"><date><year>2025</year><month>1</month><day>1</day></date></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_dateFim">
+<property name="text"><string>Data final</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDateEdit" name="dateFim">
+<property name="calendarPopup"><bool>true</bool></property>
+<property name="displayFormat"><string>dd/MM/yyyy</string></property>
+<property name="date"><date><year>2025</year><month>12</month><day>31</day></date></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinPasso">
+<property name="text"><string>Passo de integração</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Euler explícito. Passos grandes com r₀ alto podem superestimar o crescimento.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinPasso">
+<property name="toolTip"><string>Euler explícito. Passos grandes com r₀ alto podem superestimar o crescimento.</string></property>
+<property name="decimals"><number>1</number></property>
+<property name="minimum"><double>0.5</double></property>
+<property name="maximum"><double>90.0</double></property>
+<property name="singleStep"><double>1.0</double></property>
+<property name="value"><double>7.0</double></property>
+<property name="suffix"><string> dias</string></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinJanela">
+<property name="text"><string>Janela de agrupamento de eventos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Eventos da mesma janela compartilham data de referência. Janelas maiores custam menos memória.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QSpinBox" name="spinJanela">
+<property name="toolTip"><string>Eventos da mesma janela compartilham data de referência. Janelas maiores custam menos memória.</string></property>
+<property name="minimum"><number>1</number></property>
+<property name="maximum"><number>365</number></property>
+<property name="value"><number>30</number></property>
+<property name="suffix"><string> dias</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoCrescimento">
+<property name="title"><string>Crescimento e contágio</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoCrescimento">
+<item>
+<layout class="QFormLayout" name="form_grupoCrescimento">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinR0">
+<property name="text"><string>r₀ — taxa intrínseca</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinR0">
+<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre.</string></property>
+<property name="decimals"><number>5</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.001</double></property>
+<property name="value"><double>0.004</double></property>
+<property name="suffix"><string> dia⁻¹</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinEscalaContagio">
+<property name="text"><string>Escala de contágio</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Distância característica da propagação local (estimada em ~380 m).</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinEscalaContagio">
+<property name="toolTip"><string>Distância característica da propagação local (estimada em ~380 m).</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>10.0</double></property>
+<property name="maximum"><double>20000.0</double></property>
+<property name="singleStep"><double>50.0</double></property>
+<property name="value"><double>380.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_comboKernel">
+<property name="text"><string>Núcleo de contágio</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QComboBox" name="comboKernel">
+<item><property name="text"><string>exponencial</string></property></item>
+<item><property name="text"><string>gaussiano</string></property></item>
+</widget>
+</item>
+<item row="3" column="0" colspan="2">
+<widget class="QCheckBox" name="checkExcluirCentro">
+<property name="text"><string>Excluir o próprio pixel do contágio</string></property>
+<property name="toolTip"><string>Separa contágio da vizinhança de persistência local.</string></property>
+<property name="checked"><bool>false</bool></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoParamAlertas">
+<property name="title"><string>Alertas — ativação</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoParamAlertas">
+<item>
+<layout class="QFormLayout" name="form_grupoParamAlertas">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinAlertaPeso">
+<property name="text"><string>α — peso da ativação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Multiplica a taxa: α=1 dobra o crescimento sob ativação máxima.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinAlertaPeso">
+<property name="toolTip"><string>Multiplica a taxa: α=1 dobra o crescimento sob ativação máxima.</string></property>
+<property name="decimals"><number>2</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>20.0</double></property>
+<property name="singleStep"><double>0.1</double></property>
+<property name="value"><double>1.0</double></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinAlertaEscala">
+<property name="text"><string>Alcance espacial</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Decaimento exp(−d/d_A).</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinAlertaEscala">
+<property name="toolTip"><string>Decaimento exp(−d/d_A).</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>10.0</double></property>
+<property name="maximum"><double>20000.0</double></property>
+<property name="singleStep"><double>100.0</double></property>
+<property name="value"><double>1000.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinAlertaTau">
+<property name="text"><string>τ — constante de tempo</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Decaimento exp(−Δt/τ), contínuo desde o dia zero.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinAlertaTau">
+<property name="toolTip"><string>Decaimento exp(−Δt/τ), contínuo desde o dia zero.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>3650.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>90.0</double></property>
+<property name="suffix"><string> dias</string></property>
+</widget>
+</item>
+<item row="3" column="0" colspan="2">
+<widget class="QCheckBox" name="checkSemeia">
+<property name="text"><string>Alertas semeiam estado (μ mínimo na frente)</string></property>
+<property name="toolTip"><string>Um alerta é, ele próprio, detecção de garimpo novo — permite chegada em área sem vizinhança ocupada.</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_spinSemente">
+<property name="text"><string>Valor da semente</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QDoubleSpinBox" name="spinSemente">
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.05</double></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoParamFisc">
+<property name="title"><string>Fiscalização — supressão</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoParamFisc">
+<item>
+<layout class="QFormLayout" name="form_grupoParamFisc">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinFiscMax">
+<property name="text"><string>F_max — supressão máxima</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>1,0 zera o crescimento no epicentro durante o platô.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinFiscMax">
+<property name="toolTip"><string>1,0 zera o crescimento no epicentro durante o platô.</string></property>
+<property name="decimals"><number>2</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.05</double></property>
+<property name="value"><double>0.8</double></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinFiscEscala">
+<property name="text"><string>Alcance espacial</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>O efeito repressivo se concentra em 0,5–1 km.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinFiscEscala">
+<property name="toolTip"><string>O efeito repressivo se concentra em 0,5–1 km.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>10.0</double></property>
+<property name="maximum"><double>20000.0</double></property>
+<property name="singleStep"><double>50.0</double></property>
+<property name="value"><double>750.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinFiscSubida">
+<property name="text"><string>k — subida</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Valores altos reproduzem o início quase imediato do efeito.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinFiscSubida">
+<property name="toolTip"><string>Valores altos reproduzem o início quase imediato do efeito.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.001</double></property>
+<property name="maximum"><double>10.0</double></property>
+<property name="singleStep"><double>0.1</double></property>
+<property name="value"><double>1.0</double></property>
+<property name="suffix"><string> dia⁻¹</string></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinFiscPlato">
+<property name="text"><string>Duração do platô</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Patamar estável antes da dissipação.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QDoubleSpinBox" name="spinFiscPlato">
+<property name="toolTip"><string>Patamar estável antes da dissipação.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>3650.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>180.0</double></property>
+<property name="suffix"><string> dias</string></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_spinFiscQueda">
+<property name="text"><string>k — dissipação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Nitidez da queda ao fim do platô.</string></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QDoubleSpinBox" name="spinFiscQueda">
+<property name="toolTip"><string>Nitidez da queda ao fim do platô.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.001</double></property>
+<property name="maximum"><double>10.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.05</double></property>
+<property name="suffix"><string> dia⁻¹</string></property>
+</widget>
+</item>
+<item row="5" column="0">
+<widget class="QLabel" name="lbl_comboCombinacao">
+<property name="text"><string>Combinação entre eventos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Máximo evita que a mera quantidade de autos sature a supressão.</string></property>
+</widget>
+</item>
+<item row="5" column="1">
+<widget class="QComboBox" name="comboCombinacao">
+<property name="toolTip"><string>Máximo evita que a mera quantidade de autos sature a supressão.</string></property>
+<item><property name="text"><string>maximo</string></property></item>
+<item><property name="text"><string>soma_saturada</string></property></item>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaParametros"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaSaidas">
+<attribute name="title"><string>Saídas</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaSaidas">
+<item>
+<widget class="QGroupBox" name="grupoSaida">
+<property name="title"><string>Destino</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSaida">
+<item>
+<layout class="QFormLayout" name="form_grupoSaida">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_linePasta">
+<property name="text"><string>Pasta de saída</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<layout class="QHBoxLayout" name="layout_linePasta">
+<item>
+<widget class="QLineEdit" name="linePasta">
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnPasta">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linePrefixo">
+<property name="text"><string>Prefixo dos arquivos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="linePrefixo">
+<property name="text"><string>risco</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoCamadas">
+<property name="title"><string>Camadas geradas</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoCamadas">
+<item>
+<widget class="QLabel" name="nota_grupoCamadas">
+<property name="text"><string>A camada principal é sempre gerada: Δμ — a expansão prevista no horizonte, que responde 'onde vai expandir'.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoCamadas">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0" colspan="2">
+<widget class="QCheckBox" name="checkMuFinal">
+<property name="text"><string>μ final (estado ao fim do horizonte)</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="0" colspan="2">
+<widget class="QCheckBox" name="checkTaxa">
+<property name="text"><string>Taxa instantânea no fim do horizonte</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="2" column="0" colspan="2">
+<widget class="QCheckBox" name="checkCampos">
+<property name="text"><string>Campos de ativação e supressão (diagnóstico)</string></property>
+<property name="checked"><bool>false</bool></property>
+</widget>
+</item>
+<item row="3" column="0" colspan="2">
+<widget class="QCheckBox" name="checkSerie">
+<property name="text"><string>Série temporal de μ</string></property>
+<property name="checked"><bool>false</bool></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_spinPassoSerie">
+<property name="text"><string>Gravar a cada N passos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QSpinBox" name="spinPassoSerie">
+<property name="minimum"><number>1</number></property>
+<property name="maximum"><number>1000</number></property>
+<property name="value"><number>4</number></property>
+</widget>
+</item>
+<item row="5" column="0" colspan="2">
+<widget class="QCheckBox" name="checkCarregar">
+<property name="text"><string>Carregar os resultados no projeto</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaSaidas"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaExecucao">
+<attribute name="title"><string>Execução</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaExecucao">
+<item>
+<widget class="QGroupBox" name="grupoDiag">
+<property name="title"><string>Resumo</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoDiag">
+<item>
+<layout class="QFormLayout" name="form_grupoDiag">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_lineResumo">
+<property name="text"><string>Última execução</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QLineEdit" name="lineResumo">
+<property name="placeholderText"><string>—</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoLog">
+<property name="title"><string>Registro</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoLog">
+<item>
+<widget class="QPlainTextEdit" name="textoLog">
+<property name="readOnly"><bool>true</bool></property>
+<property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property>
+</widget>
+</item>
+</layout>
+</widget>
+</item>
+</layout>
+</widget>
+</widget>
+</item>
+<item>
+<widget class="QProgressBar" name="barraProgresso">
+<property name="value"><number>0</number></property>
+<property name="textVisible"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QHBoxLayout" name="layoutBotoes">
+<item>
+<widget class="QLabel" name="lblStatus">
+<property name="text"><string>Pronto.</string></property>
+</widget>
+</item>
+<item>
+<spacer name="espBotoes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer>
+</item>
+<item>
+<widget class="QPushButton" name="btnExecutar">
+<property name="text"><string>Executar</string></property>
+<property name="default"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnCancelar">
+<property name="text"><string>Cancelar</string></property>
+<property name="enabled"><bool>false</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnFechar">
+<property name="text"><string>Fechar</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+ <resources/>
+ <connections/>
+</ui>

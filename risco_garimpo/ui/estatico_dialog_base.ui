@@ -1,0 +1,650 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EstaticoDialogBase</class>
+<widget class="QDialog" name="EstaticoDialogBase">
+<property name="geometry"><rect><x>0</x><y>0</y><width>820</width><height>720</height></rect></property>
+<property name="windowTitle"><string>Risco Garimpo — Modelo Estático (K)</string></property>
+<layout class="QVBoxLayout" name="layoutPrincipal">
+<item>
+<widget class="QTabWidget" name="abas">
+<property name="currentIndex"><number>0</number></property>
+<widget class="QWidget" name="abaInsumos">
+<attribute name="title"><string>Insumos</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaInsumos">
+<item>
+<widget class="QGroupBox" name="grupoVariaveis">
+<property name="title"><string>Variáveis de terreno</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoVariaveis">
+<item>
+<widget class="QLabel" name="nota_grupoVariaveis">
+<property name="text"><string>Variáveis de TERRENO apenas. O garimpo pretérito (μ) não entra aqui: ele calibra o nível, nunca a ordenação.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoVariaveis">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboIBx">
+<property name="text"><string>PGgeom — potencial geomorfológico (baixões)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Raster contínuo. Se você tiver o IBx cru, aplique antes a transformação calibrada.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboIBx">
+<property name="toolTip"><string>Raster contínuo. Se você tiver o IBx cru, aplique antes a transformação calibrada.</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboEst">
+<property name="text"><string>Est — favorabilidade estrutural</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Proximidade a lineamentos. Meça o poder discriminante antes de incluir: contraste sem raridade não seleciona território.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboEst">
+<property name="toolTip"><string>Proximidade a lineamentos. Meça o poder discriminante antes de incluir: contraste sem raridade não seleciona território.</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_comboLito">
+<property name="text"><string>Lt — favorabilidade litológica (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Prefira a litologia por pixel. Média por sub-bacia dilui o sinal.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QComboBox" name="comboLito">
+<property name="toolTip"><string>Prefira a litologia por pixel. Média por sub-bacia dilui o sinal.</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoEstado">
+<property name="title"><string>Ocupação observada e recorte</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoEstado">
+<item>
+<layout class="QFormLayout" name="form_grupoEstado">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboMu">
+<property name="text"><string>μ — garimpo observado na data de referência</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Usado para estimar o NÍVEL de saturação por classe de terreno. Não entra na ordenação.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboMu">
+<property name="toolTip"><string>Usado para estimar o NÍVEL de saturação por classe de terreno. Não entra na ordenação.</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_comboMuAntigo">
+<property name="text"><string>μ do ano mais antigo da série (maturidade)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Define quais pixels tiveram exposição longa ao processo. Sem exposição não há saturação observável.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QComboBox" name="comboMuAntigo">
+<property name="toolTip"><string>Define quais pixels tiveram exposição longa ao processo. Sem exposição não há saturação observável.</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_comboMuAnterior">
+<property name="text"><string>μ do ano anterior (variação no último ano)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Usado só para a coluna de variação e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QComboBox" name="comboMuAnterior">
+<property name="toolTip"><string>Usado só para a coluna de variação e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_comboMascara">
+<property name="text"><string>Máscara da área de estudo</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Valores &gt; 0 delimitam a área. Furos (corpos d'água) são simplesmente excluídos do universo.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QComboBox" name="comboMascara">
+<property name="toolTip"><string>Valores &gt; 0 delimitam a área. Furos (corpos d'água) são simplesmente excluídos do universo.</string></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_comboAgua">
+<property name="text"><string>Corpos d'água — estrato (opcional)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Tratados como ESTRATO, não como máscara: o leito recebe nível próprio, porque garimpo de balsa não obedece à geomorfologia de barranco.</string></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QComboBox" name="comboAgua">
+<property name="toolTip"><string>Tratados como ESTRATO, não como máscara: o leito recebe nível próprio, porque garimpo de balsa não obedece à geomorfologia de barranco.</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoSubbacias">
+<property name="title"><string>Sub-bacias — unidade de saída</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSubbacias">
+<item>
+<widget class="QLabel" name="nota_grupoSubbacias">
+<property name="text"><string>A sub-bacia é unidade de SAÍDA. A combinação e a subtração acontecem no pixel; só o resultado é somado aqui. Somar conserva a grandeza; tirar média das variáveis destruiria o sinal.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoSubbacias">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboSubbacias">
+<property name="text"><string>Camada de sub-bacias (HydroBASINS nível 12)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Opcional. Gera a tabela de Potencial Aurífero Remanescente por sub-bacia.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboSubbacias">
+<property name="toolTip"><string>Opcional. Gera a tabela de Potencial Aurífero Remanescente por sub-bacia.</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linhaCampoId">
+<property name="text"><string>Campo identificador</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Ex.: HYBAS_ID. Vazio usa o id interno da feição.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="linhaCampoId">
+<property name="toolTip"><string>Ex.: HYBAS_ID. Vazio usa o id interno da feição.</string></property>
+<property name="placeholderText"><string>HYBAS_ID</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoGrade">
+<property name="title"><string>Grade de trabalho</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoGrade">
+<item>
+<layout class="QFormLayout" name="form_grupoGrade">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboCRS">
+<property name="text"><string>CRS de referência</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Precisa ser projetado, em metros.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboCRS">
+<property name="toolTip"><string>Precisa ser projetado, em metros.</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinResolucao">
+<property name="text"><string>Resolução</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>30 m é a resolução nativa do MapBiomas. A errata do fluxograma registra erro de modelagem a 100 m.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinResolucao">
+<property name="toolTip"><string>30 m é a resolução nativa do MapBiomas. A errata do fluxograma registra erro de modelagem a 100 m.</string></property>
+<property name="decimals"><number>1</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>5000.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>30.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_lblGrade">
+<property name="text"><string>Grade resultante</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Tamanho em pixels e memória estimada.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QLineEdit" name="lblGrade">
+<property name="toolTip"><string>Tamanho em pixels e memória estimada.</string></property>
+<property name="placeholderText"><string>—</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaInsumos"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaParametros">
+<attribute name="title"><string>Parâmetros</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaParametros">
+<item>
+<widget class="QGroupBox" name="grupoPesos">
+<property name="title"><string>Pesos e combinação</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoPesos">
+<item>
+<layout class="QFormLayout" name="form_grupoPesos">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinPesoIBx">
+<property name="text"><string>Peso de PGgeom</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Peso AHP. São normalizados para somar 1.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinPesoIBx">
+<property name="toolTip"><string>Peso AHP. São normalizados para somar 1.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.591</double></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinPesoEst">
+<property name="text"><string>Peso de Est</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Peso AHP.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinPesoEst">
+<property name="toolTip"><string>Peso AHP.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.075</double></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinPesoLito">
+<property name="text"><string>Peso de Lt</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Peso AHP. Ignorado se a camada não for informada.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinPesoLito">
+<property name="toolTip"><string>Peso AHP. Ignorado se a camada não for informada.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.334</double></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinGamma">
+<property name="text"><string>γ do fuzzy gamma</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>0 = produto (conjuntivo, pessimista); 1 = soma algébrica (disjuntivo). Valores baixos preservam sinergia relativamente a gammas altos.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QDoubleSpinBox" name="spinGamma">
+<property name="toolTip"><string>0 = produto (conjuntivo, pessimista); 1 = soma algébrica (disjuntivo). Valores baixos preservam sinergia relativamente a gammas altos.</string></property>
+<property name="decimals"><number>2</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.05</double></property>
+<property name="value"><double>0.4</double></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoPisos">
+<property name="title"><string>Pisos — o antídoto do veto</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoPisos">
+<item>
+<layout class="QFormLayout" name="form_grupoPisos">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinPiso">
+<property name="text"><string>Piso das variáveis</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>No produto ponderado, 0^w = 0 para qualquer peso: uma única variável zerada anula o pixel. O piso preserva a ordem e impede que a variável mais fraca decida sozinha onde não pode haver garimpo.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinPiso">
+<property name="toolTip"><string>No produto ponderado, 0^w = 0 para qualquer peso: uma única variável zerada anula o pixel. O piso preserva a ordem e impede que a variável mais fraca decida sozinha onde não pode haver garimpo.</string></property>
+<property name="decimals"><number>4</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>0.5</double></property>
+<property name="singleStep"><double>0.001</double></property>
+<property name="value"><double>0.008</double></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_checkDiagnosticarVeto">
+<property name="text"><string>Relatar quanto da área cada variável zeraria</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QCheckBox" name="checkDiagnosticarVeto">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoNivel">
+<property name="title"><string>Nível — a proporção máxima esperada</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoNivel">
+<item>
+<widget class="QLabel" name="nota_grupoNivel">
+<property name="text"><string>K sai em [0, 1]: a proporção da área do pixel que se espera explorada no máximo, tudo mais constante.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoNivel">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_checkEstimarNivel">
+<property name="text"><string>Estimar o nível a partir da saturação observada</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QCheckBox" name="checkEstimarNivel">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinJanela">
+<property name="text"><string>Janela de ocupação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Escala em que a saturação é medida. O pixel isolado não mede saturação; a vizinhança mede.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinJanela">
+<property name="toolTip"><string>Escala em que a saturação é medida. O pixel isolado não mede saturação; a vizinhança mede.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>30.0</double></property>
+<property name="maximum"><double>5000.0</double></property>
+<property name="singleStep"><double>10.0</double></property>
+<property name="value"><double>380.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinQuantil">
+<property name="text"><string>Quantil de saturação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Quantil alto da ocupação local entre os pixels maduros. É limite INFERIOR do teto: nada garante que algum lugar já tenha saturado.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinQuantil">
+<property name="toolTip"><string>Quantil alto da ocupação local entre os pixels maduros. É limite INFERIOR do teto: nada garante que algum lugar já tenha saturado.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.5</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.99</double></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_spinFaixas">
+<property name="text"><string>Faixas de escore</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Número de classes de terreno na estimativa do nível.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QSpinBox" name="spinFaixas">
+<property name="toolTip"><string>Número de classes de terreno na estimativa do nível.</string></property>
+<property name="minimum"><number>5</number></property>
+<property name="maximum"><number>201</number></property>
+<property name="value"><number>51</number></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_spinMinimoFaixa">
+<property name="text"><string>Mínimo por faixa</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Faixas com menos pixels que isto não estimam quantil e ficam de fora do ajuste monótono.</string></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QSpinBox" name="spinMinimoFaixa">
+<property name="toolTip"><string>Faixas com menos pixels que isto não estimam quantil e ficam de fora do ajuste monótono.</string></property>
+<property name="minimum"><number>10</number></property>
+<property name="maximum"><number>100000</number></property>
+<property name="value"><number>200</number></property>
+</widget>
+</item>
+<item row="5" column="0">
+<widget class="QLabel" name="lbl_spinTeto">
+<property name="text"><string>Teto fixo (se não estimar)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Só usado com a estimativa desligada. 0,70 embute margem de expansão de ≈6,5× sobre a ocupação observada — é hipótese, não medida.</string></property>
+</widget>
+</item>
+<item row="5" column="1">
+<widget class="QDoubleSpinBox" name="spinTeto">
+<property name="toolTip"><string>Só usado com a estimativa desligada. 0,70 embute margem de expansão de ≈6,5× sobre a ocupação observada — é hipótese, não medida.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.7</double></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaParametros"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaSaidas">
+<attribute name="title"><string>Saídas</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaSaidas">
+<item>
+<widget class="QGroupBox" name="grupoSaida">
+<property name="title"><string>Onde gravar</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSaida">
+<item>
+<widget class="QLabel" name="nota_grupoSaida">
+<property name="text"><string>Sempre gerado: &lt;prefixo&gt;_K.tif — a proporção máxima esperada, entrada do modelo dinâmico. Com sub-bacias informadas, sai também &lt;prefixo&gt;_subbacias.gpkg com o potencial remanescente, o grau de explotação e o ranking.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoSaida">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_linhaPasta">
+<property name="text"><string>Pasta de saída</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Onde os rasters serão gravados.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<layout class="QHBoxLayout" name="layout_linhaPasta">
+<item>
+<widget class="QLineEdit" name="linhaPasta">
+<property name="toolTip"><string>Onde os rasters serão gravados.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnPasta">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linhaPrefixo">
+<property name="text"><string>Prefixo dos arquivos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="linhaPrefixo">
+<property name="text"><string>PMT</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_checkEscore">
+<property name="text"><string>Gravar também o escore (ordenação, sem nível)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QCheckBox" name="checkEscore">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_checkRemanescente">
+<property name="text"><string>Gravar o potencial remanescente (K − μ)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="3" column="1">
+<widget class="QCheckBox" name="checkRemanescente">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_checkTabela">
+<property name="text"><string>Gravar a tabela de saturação por faixa (CSV)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="4" column="1">
+<widget class="QCheckBox" name="checkTabela">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="5" column="0">
+<widget class="QLabel" name="lbl_checkCarregar">
+<property name="text"><string>Carregar os resultados no projeto</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item row="5" column="1">
+<widget class="QCheckBox" name="checkCarregar">
+<property name="text"><string></string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaSaidas"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaRegistro">
+<attribute name="title"><string>Registro</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaRegistro">
+<item>
+<widget class="QGroupBox" name="grupoLogEstatico">
+<property name="title"><string>Registro</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoLogEstatico">
+<item>
+<widget class="QPlainTextEdit" name="textoLog">
+<property name="readOnly"><bool>true</bool></property>
+<property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property>
+</widget>
+</item>
+</layout>
+</widget>
+</item>
+</layout>
+</widget>
+</widget>
+</item>
+<item>
+<widget class="QProgressBar" name="barraProgresso">
+<property name="value"><number>0</number></property>
+<property name="textVisible"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QHBoxLayout" name="layoutBotoes">
+<item>
+<widget class="QLabel" name="lblStatus">
+<property name="text"><string>Pronto.</string></property>
+</widget>
+</item>
+<item>
+<spacer name="espBotoes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer>
+</item>
+<item>
+<widget class="QPushButton" name="btnExecutar">
+<property name="text"><string>Gerar K</string></property>
+<property name="default"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnCancelar">
+<property name="text"><string>Cancelar</string></property>
+<property name="enabled"><bool>false</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnFechar">
+<property name="text"><string>Fechar</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+ <resources/>
+ <connections/>
+</ui>

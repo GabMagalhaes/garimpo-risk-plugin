@@ -1,0 +1,23 @@
+[general]
+name=Risco Garimpo
+qgisMinimumVersion=3.22
+description=Duas ferramentas: o modelo estático, que estima K — a proporção da área que se espera explorada no máximo —, e o modelo dinâmico, que simula a expansão do garimpo ilegal consumindo esse K.
+version=0.3.0
+author=Gabriel Campos Magalhães (PPGEDAM/NUMA/UFPA)
+email=gabriel.campos.magalhaes@gmail.com
+
+about=Produto da dissertação sobre antecipação da expansão do garimpo ilegal na Província Mineral do Tapajós. Traz duas ferramentas independentes, separadas por arquivo e não por chamada. MODELO ESTÁTICO: combina as variáveis de terreno (PGgeom, Est, litologia) por fuzzy gamma ponderado, com piso contra o veto do produto, e devolve K em [0, 1] — a proporção da área do pixel que se espera explorada no máximo. O nível de K é estimado da saturação observada em terreno de exposição longa, por substituição espaço-tempo, e não decretado; o leito de rio recebe nível próprio, porque garimpo de balsa não obedece à geomorfologia de barranco. MODELO DINÂMICO: resolve, em superfície contínua, uma equação logística de crescimento em que K é a capacidade de suporte, o contágio opera na escala local (~380 m), os alertas entram como ativação com decaimento exponencial contínuo desde o dia zero e os autos de infração como supressão em platô logístico (~180 dias, alcance de 0,5–1 km). A sub-bacia HydroBASINS nível 12 é unidade de saída e reporte, nunca de propagação.
+
+tracker=https://github.com/GabMagalhaes/garimpo-risk-plugin/issues
+repository=https://github.com/GabMagalhaes/garimpo-risk-plugin
+homepage=https://github.com/GabMagalhaes/garimpo-risk-plugin
+
+category=Raster
+icon=resources/icon.svg
+experimental=True
+deprecated=False
+
+hasProcessingProvider=no
+changelog=0.3.0 - Potencial Aurífero Remanescente (K - mu) por pixel e somado por sub-bacia, com grau de explotacao, excedente, variacao no ultimo ano e projecao de esgotamento.
+    0.2.0 - Modelo estático como segunda ferramenta: fuzzy gamma ponderado com piso contra o veto, nível de K estimado da saturação observada, estratos (terra e leito) com nível próprio.
+    0.1.0 - Primeira versão: modelo dinâmico, pré-processamento de alertas em frentes, agregação por sub-bacia.
