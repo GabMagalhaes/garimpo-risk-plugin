@@ -28,6 +28,7 @@ import csv
 import datetime as dt
 import json
 import math
+import os
 import re
 import time
 import unicodedata
@@ -44,10 +45,12 @@ ID_CAMADA_SUBBACIAS = None        # alternativa: ID da camada, se o nome se repe
 CAMPO_ID_SUBBACIAS = 'HYBAS_ID'
 
 FONTE_K = 'campo'                 # 'campo' nas sub-bacias, 'raster' ou 'vetor' (grade com campo)
-CAMPO_K = None                    # obrigatório para 'campo' e 'vetor'
+CAMPO_K = 'pa_rem_ha'             # potencial aurífero remanescente Σ máx(K−μ,0), em ha;
+                                  # alternativa: 'pa_k_ha' (potencial total, sem μ)
 CAMADA_K = 'PMT_v2_K'             # usado com 'raster' ou 'vetor'
 ID_CAMADA_K = None
-TRANSFORMACOES_K = ('nenhuma', 'logit')   # candidatas; escolha na validação interna
+TRANSFORMACOES_K = ('nenhuma', 'logit', 'log1p')  # só as válidas para o intervalo de K
+                                                  # concorrem na validação interna
 
 CAMADA_SOCIO = None               # None: camada única carregada com HYBAS_ID e socio_pre
 ID_CAMADA_SOCIO = None
@@ -67,8 +70,9 @@ CLASSES = {
 
 # Eventos pontuais/poligonais com data; só entram se configurados explicitamente.
 # sigla: 'REPR' (IBAMA/ICMBio), 'CAR', 'SIGEF' ou 'ANM'. Exemplo:
-# dict(sigla='REPR', camada='autos_ibama', id=None, campo_data='dat_auto',
-#      campo_disponibilidade=None, expressao=None),
+# dict(sigla='REPR', camada='Autos Infracao Ibama — clipped', id=None,
+#      campo_data='dat_hora_auto_infracao', campo_disponibilidade='dt_lancamento',
+#      expressao=None),
 EVENTOS = ()
 
 DATA_INICIO_COBERTURA = '2020-09' # primeiro mês com cobertura dos alertas
@@ -292,7 +296,18 @@ def transformar_k(k, modo):
     if modo == 'logit':
         kc = np.clip(k, 1e-4, 1 - 1e-4)
         return np.log(kc / (1 - kc))
+    if modo == 'log1p':
+        return np.log1p(k)
     raise ValueError('Transformação de K desconhecida: %s.' % modo)
+
+
+def transformacao_valida(modo, k):
+    """logit exige K em [0,1] (proporção); log1p exige K ≥ 0 (p. ex. hectares)."""
+    if modo == 'logit':
+        return k.min() >= 0 and k.max() <= 1
+    if modo == 'log1p':
+        return k.min() >= 0
+    return True
 
 
 def valores_termo(p, nome, ktrans='nenhuma', sigma=None):
@@ -375,22 +390,24 @@ def _penal(k, ridge):
     return pen
 
 
-def ajustar_logit(Z, y, ridge, grupos=None, max_iter=100):
+def ajustar_logit(Z, y, ridge, grupos=None, max_iter=100, pesos=None):
+    """Logística penalizada; pesos corrigem amostragem de ausências (1/q)."""
     n, k = Z.shape
     X = np.column_stack([np.ones(n), Z])
     pen = _penal(k, ridge)
+    w = np.ones(n) if pesos is None else np.asarray(pesos, dtype=float)
     beta = np.zeros(k + 1)
-    m = min(max(float(y.mean()), 1e-6), 1 - 1e-6)
+    m = min(max(float(np.sum(w * y) / np.sum(w)), 1e-6), 1 - 1e-6)
     beta[0] = math.log(m / (1 - m))
 
     def objetivo(b):
         eta = X @ b
-        return float(np.sum(np.logaddexp(0.0, eta) - y * eta) + 0.5 * np.sum(pen * b * b))
+        return float(np.sum(w * (np.logaddexp(0.0, eta) - y * eta)) + 0.5 * np.sum(pen * b * b))
     f, conv = objetivo(beta), False
     for _ in range(max_iter):
         p = expit(X @ beta)
-        g = X.T @ (p - y) + pen * beta
-        H = (X * (p * (1 - p))[:, None]).T @ X + np.diag(pen) + 1e-10 * np.eye(k + 1)
+        g = X.T @ (w * (p - y)) + pen * beta
+        H = (X * (w * p * (1 - p))[:, None]).T @ X + np.diag(pen) + 1e-10 * np.eye(k + 1)
         passo, s = np.linalg.solve(H, g), 1.0
         while True:
             nb = beta - s * passo
@@ -403,8 +420,8 @@ def ajustar_logit(Z, y, ridge, grupos=None, max_iter=100):
             conv = True
             break
     p = expit(X @ beta)
-    H = (X * (p * (1 - p))[:, None]).T @ X + np.diag(pen)
-    return beta, conv, ep_cluster(X, y - p, H, grupos)
+    H = (X * (w * p * (1 - p))[:, None]).T @ X + np.diag(pen)
+    return beta, conv, ep_cluster(X, w * (y - p), H, grupos)
 
 
 def ajustar_lognormal(Z, y, ridge, grupos=None):
@@ -452,7 +469,8 @@ class DuasPartes:
     def __init__(self, termos, familia, ridge):
         self.termos, self.familia, self.ridge = tuple(termos), familia, ridge
 
-    def ajustar(self, X, y, grupos=None):
+    def ajustar(self, X, y, grupos=None, pesos=None, teto=None):
+        """pesos: só na presença (ausências amostradas); teto: limite de E[ha | ha > 0]."""
         dp = X.std(axis=0)
         self.ativos = dp > 1e-12
         self.descartados = [t for t, a in zip(self.termos, self.ativos) if not a]
@@ -464,7 +482,8 @@ class DuasPartes:
         if self.n_pos < 10 or self.n - self.n_pos < 10:
             raise ValueError('Ajuste com menos de 10 presenças ou ausências (%d de %d).'
                              % (self.n_pos, self.n))
-        self.b_p, self.conv_p, self.ep_p = ajustar_logit(Z, pos.astype(float), self.ridge, grupos)
+        self.b_p, self.conv_p, self.ep_p = ajustar_logit(Z, pos.astype(float), self.ridge, grupos,
+                                                         pesos=pesos)
         g2 = grupos[pos] if grupos is not None else None
         if self.familia == 'lognormal':
             ajuste = ajustar_lognormal
@@ -473,15 +492,15 @@ class DuasPartes:
         else:
             raise ValueError('Família de área desconhecida: %s.' % self.familia)
         self.b_a, self.smear, self.conv_a, self.ep_a = ajuste(Z[pos], y[pos], self.ridge, g2)
-        # Salvaguarda contra extrapolação: média condicional limitada a 10× o maior valor visto.
-        self.eta_max = math.log(float(y[pos].max()) * 10)
+        # Salvaguarda contra extrapolação: por padrão, 10× o maior valor visto no ajuste.
+        self.teto = float(teto) if teto else float(y[pos].max()) * 10
         return self
 
     def prever(self, X):
         Z = (X[:, self.ativos] - self.media) / self.dp
         Xc = np.column_stack([np.ones(len(Z)), Z])
         p = expit(Xc @ self.b_p)
-        mu = np.exp(np.minimum(Xc @ self.b_a, self.eta_max)) * self.smear
+        mu = np.minimum(np.exp(np.minimum(Xc @ self.b_a, 50.0)) * self.smear, self.teto)
         return p, mu, p * mu
 
     def coeficientes(self):
@@ -693,9 +712,13 @@ def executar_modelagem(p, cfg, progresso=log):
     rel['especificacoes'] = {n: list(t) for n, t in especs.items()}
     rk = np.random.default_rng(cfg['semente']).random(p['n_b'])
     kv = p['K'][np.isfinite(p['K'])]
-    ktrans = [k for k in cfg['ktrans'] if k != 'logit' or (kv.min() >= 0 and kv.max() <= 1)]
-    if len(ktrans) < len(cfg['ktrans']):
-        rel['avisos'].append('K fora de [0,1]: transformação logit descartada.')
+    ktrans = [k for k in cfg['ktrans'] if transformacao_valida(k, kv)]
+    descartadas = [k for k in cfg['ktrans'] if k not in ktrans]
+    if descartadas:
+        rel['avisos'].append('K em [%.4g, %.4g]: transformações incompatíveis descartadas: %s.'
+                             % (kv.min(), kv.max(), ', '.join(descartadas)))
+    if not ktrans:
+        raise ValueError('Nenhuma transformação de K compatível com o intervalo de K.')
     frac = cfg['topo']
 
     def ajustar(termos, fam, kt, sig, origs, agrupar=False):
@@ -992,18 +1015,34 @@ def eh_poligono(lyr):
     return getattr(g, 'value', g) == 2
 
 
-def achar_socio(projeto, problemas):
+def fonte(c):
+    """Fonte da camada sem senha, para comparar e registrar."""
+    try:
+        from qgis.core import QgsDataSourceUri
+        return QgsDataSourceUri.removePassword(c.source(), True)
+    except Exception:
+        return '(fonte não registrada)'
+
+
+def achar_socio(projeto, problemas, avisos):
     if CAMADA_SOCIO or ID_CAMADA_SOCIO:
         return resolver_camada(projeto, CAMADA_SOCIO, ID_CAMADA_SOCIO, 'Socioambiental', problemas)
     cands = [c for c in projeto.mapLayers().values()
              if c.isValid() and hasattr(c, 'fields')
              and {'socio_pre', CAMPO_ID_SUBBACIAS} <= set(c.fields().names())
              and 'classe_crit' not in c.fields().names()]   # exclui saídas deste script
+    fontes = {fonte(c).replace('\\', '/').casefold() for c in cands}
+    if len(cands) > 1 and len(fontes) == 1 and 'memory' not in {c.providerType() for c in cands}:
+        avisos.append('Socioambiental: %d camadas carregadas apontam para a mesma fonte (%s); '
+                      'usando %s [ID=%s].' % (len(cands), fonte(cands[0]), cands[0].name(),
+                                              cands[0].id()))
+        return cands[0]
     if len(cands) != 1:
-        problemas.append('Socioambiental: %d camadas carregadas têm %s e socio_pre%s. Execute '
-                         'risco_socioambiental_console_v2.py ou configure CAMADA_SOCIO/ID.'
-                         % (len(cands), CAMPO_ID_SUBBACIAS, ': ' + ', '.join(
-                             '%s [ID=%s]' % (c.name(), c.id()) for c in cands) if cands else ''))
+        problemas.append('Socioambiental: %d camadas carregadas têm %s e socio_pre%s. Remova as '
+                         'duplicadas do projeto ou configure ID_CAMADA_SOCIO.'
+                         % (len(cands), CAMPO_ID_SUBBACIAS, ': ' + '; '.join(
+                             '%s [ID=%s] ← %s' % (c.name(), c.id(), fonte(c)) for c in cands)
+                            if cands else ''))
         return None
     return cands[0]
 
@@ -1496,7 +1535,8 @@ def inventario(projeto, pasta, problemas, avisos):
     for c in projeto.mapLayers().values():
         vetor = hasattr(c, 'fields') and hasattr(c, 'getFeatures')
         r = dict(nome=c.name(), id=c.id(), valida=c.isValid(), crs=c.crs().authid(),
-                 tipo='vetor' if vetor else 'raster' if hasattr(c, 'bandCount') else 'outro')
+                 tipo='vetor' if vetor else 'raster' if hasattr(c, 'bandCount') else 'outro',
+                 fonte=fonte(c))
         if vetor:
             r.update(feicoes_visiveis=c.featureCount(), filtro_ativo=bool(c.subsetString()),
                      selecionadas=c.selectedFeatureCount(), campos=c.fields().names())
@@ -1535,7 +1575,7 @@ def main():
                              raster=FONTE_K == 'raster')
         if FONTE_K == 'vetor':
             ck = campo_existente(lk, CAMPO_K, 'K na grade', problemas)
-    soc = achar_socio(projeto, problemas)
+    soc = achar_socio(projeto, problemas, avisos)
     sid = campo_existente(soc, CAMPO_ID_SUBBACIAS, 'Chave socioambiental', problemas)
     al = resolver_camada(projeto, CAMADA_ALERTAS, ID_CAMADA_ALERTAS, 'Alertas', problemas)
     if al is not None and not eh_poligono(al):
@@ -1708,5 +1748,6 @@ def main():
     return {'status': 'ok', 'pasta': str(pasta)}
 
 
-if TEM_QGIS and EXECUTAR_AO_ABRIR:
+# A versão em raster importa este arquivo como núcleo e define esta variável.
+if TEM_QGIS and EXECUTAR_AO_ABRIR and not os.environ.get('MODELO_INTEGRADO_SO_NUCLEO'):
     main()

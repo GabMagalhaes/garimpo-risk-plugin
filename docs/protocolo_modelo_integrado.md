@@ -72,7 +72,7 @@ Períodos de origem mantidos: ajuste interno jan/2021–jun/2022, validação in
 | Termo | Definição (janela L = 6 meses) | Observação |
 |---|---|---|
 | `log_area` | log da área elipsoidal da sub-bacia (km²) | Controla o tamanho da unidade |
-| `K` | Média de K na sub-bacia, sem transformação ou em logit | K deve excluir população e mercúrio |
+| `K` | Padrão: `pa_rem_ha`, potencial aurífero remanescente Σ máx(K − μ, 0) em ha, gerado pelo plugin. Concorrem só as transformações compatíveis: log1p ou sem transformação para hectares; logit para proporções em [0,1] | K deve excluir população e mercúrio; o ano de μ deve anteceder o teste |
 | `G` | log1p dos hectares de garimpo detectados e disponíveis | Histórico recente na própria sub-bacia |
 | `Gviz` | log1p da soma de G nas sub-bacias que se tocam | Versão por sub-bacia da propagação espacial |
 | `A` | log1p dos hectares de Acesso | Pressão antrópica |
@@ -207,7 +207,7 @@ Campos principais: `ha_prev`, `p_prev`, `mu_prev`, `dens_prev`, `rank_prev`, `to
 
 ## 11. Limitações
 
-- K é tratado como estático. Suas fontes, em especial a área previamente garimpada do MapBiomas, precisam anteceder o período de teste. Caso contrário, o teste fica otimista.
+- K é tratado como estático. Suas fontes, em especial a área previamente garimpada do MapBiomas, precisam anteceder o período de teste. Caso contrário, o teste fica otimista. Com `pa_rem_ha`, isso vale para o raster μ usado no plugin: se μ for de 2024 ou depois, o remanescente já desconta garimpo do período de teste. `pa_k_ha` (potencial total, sem μ) evita esse problema, mas não representa o "(−)" da figura.
 - A camada atual do SIGMINE não reconstrói fases passadas. CAR/SIGEF/ANM ficam pendentes até haver eventos versionados.
 - Alertas detectados dentro de títulos de mineração legal entram no desfecho, salvo se a camada de alertas tiver sido filtrada como na validação anterior.
 - A vizinhança é contiguidade simples. Ligações hidrológicas montante–jusante não estão modeladas, e o dano químico a receptores distantes não é atribuído.
@@ -218,7 +218,54 @@ Campos principais: `ha_prev`, `p_prev`, `mu_prev`, `dens_prev`, `rank_prev`, `to
 
 > O modelo integrado combinou a favorabilidade estática de garimpo ilegal com indicadores dinâmicos de pressão antrópica e de transformação territorial recentes em um modelo preditivo em duas partes, ajustado no painel sub-bacia × origem mensal. A probabilidade de novos alertas de garimpo nos seis meses seguintes e a área condicional foram estimadas com informação disponível antes de cada origem. Os pesos de cada componente foram estimados, e não fixados. Transformações, escala de suavização e especificação foram escolhidas somente com ajuste e validação internos; o período 2024–2025 foi reportado como avaliação exploratória. Para a definição de áreas críticas, os hectares previstos foram ponderados pela prioridade socioambiental preventiva dividida por cinco. Essa ponderação é uma convenção de decisão, não uma relação empírica, e foi acompanhada de cenários de sensibilidade para a ausência de informação química ou populacional. As sub-bacias com maior expectativa de garimpo que perderam prioridade por essa ponderação foram identificadas separadamente.
 
-## 13. Verificação
+## 13. Versão em raster (100 m)
+
+`modelo_integrado_raster_console.py` aplica o mesmo modelo com o pixel de 100 m como unidade. Ele carrega `modelo_integrado_console.py` como **núcleo**, sem executar o modelo por sub-bacia, e reutiliza:
+
+- as configurações compartilhadas: camadas, classes, disponibilidade, eventos, períodos, σ, famílias, ridge e topo;
+- a regra temporal;
+- o modelo em duas partes;
+- as três etapas de seleção com a tolerância de 0,5 p.p.;
+- a camada de decisão `crit = hectares previstos × socio_pre/5`, com os mesmos cenários.
+
+O que muda com a unidade:
+
+| Elemento | Sub-bacia | Pixel de 100 m |
+|---|---|---|
+| K | `pa_rem_ha` da sub-bacia | Raster `PMT_v2_remanescente`, reamostrado por média da área |
+| G, A, D, R, B, eventos | Soma na sub-bacia | Soma numa janela quadrada de meia-largura r, normalizada pelo suporte do domínio |
+| Gviz | Soma nas sub-bacias que se tocam | Anel entre r e 3r |
+| Escala espacial | A própria sub-bacia | r ∈ {1; 2,5; 5 km}, escolhido na validação interna junto com a transformação de K e a família |
+| Passa-baixa de R e B | Distribuição de cada detecção entre sub-bacias | Gσ(v·z)/Gσ(v) na grade, antes da janela, como no protocolo territorial |
+| Desfecho | ha de garimpo na sub-bacia | ha de garimpo no pixel (fração coberta, com 5 × 5 subpixels), limitado a 1 ha |
+| Ajuste | Todas as sub-bacias | Todas as presenças e 30 mil ausências amostradas por origem, com peso 1/q na logística |
+| Critério de seleção | Captura nas 10% sub-bacias | Captura nos 10% de pixels (área), estimada na amostra ponderada |
+| socio_pre | Da sub-bacia | Da sub-bacia que contém o pixel |
+
+A amostragem de ausências com peso 1/q preserva a calibração da probabilidade. Num teste sintético, o intercepto ponderado foi −4,004 contra −4,008 do ajuste completo; sem peso, foi −1,0.
+
+O teste histórico é avaliado na **grade cheia**:
+- captura nos 1, 5 e 10% de pixels;
+- captura nas 10% sub-bacias, somando a previsão dos pixels, diretamente comparável ao modelo por sub-bacia;
+- AUC numa amostra de ausências;
+- bootstrap pareado por blocos sobre a captura por sub-bacia.
+
+Na régua, a escala de sub-bacia usa os hectares do semestre anterior na própria sub-bacia, como no modelo por sub-bacia.
+
+Saídas:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `previsao_100m.tif` | ha_prev, p_prev, crit_est, crit_min, crit_max |
+| `classes_criticas_100m.tif` | Classe (1 Crítica, 2 Crítica sob sensibilidade, 3 Não crítica), topo_crit, topo_sens, topo_prev |
+| `subbacias_agregado.csv` | Por sub-bacia: soma da previsão e de crit, % de área crítica e sensível |
+| `relatorio_raster.json` / `.txt` e `classes_criticas_100m.qml` | Relatório e estilo |
+
+Os topos das classes são frações da **área** (pixels válidos). Uma classe "Crítica" no topo de 10% cobre cerca de 12 mil km², o que pode ser largo demais para uso operacional. Os topos de 1% e 5% ficam em `topo_crit`.
+
+**Custo esperado:** a grade de 100 m tem cerca de 4.450 × 4.400 pixels, dos quais uns 12 milhões são válidos. A rasterização dos alertas, a passagem por cerca de 53 origens e o teste em grade cheia devem levar algo como 15 a 30 minutos e alguns GB de memória. Ainda não foi medido nos dados reais.
+
+## 14. Verificação
 
 O núcleo numérico foi testado fora do QGIS, com NumPy 2.5:
 
@@ -228,5 +275,12 @@ O núcleo numérico foi testado fora do QGIS, com NumPy 2.5:
 - desempates na captura;
 - classes críticas com socio ausente ou imputado;
 - execução completa com 400 sub-bacias sintéticas, incluindo seleção, teste, bootstrap e previsão operacional.
+
+Versão em raster, também fora do QGIS:
+- imagem integral e passa-baixa gaussiano conferidos contra cálculo direto;
+- recuperação do intercepto com ausências amostradas e ponderadas;
+- execução completa numa grade sintética de 60 × 80 pixels, com garimpo autoexcitado e estradas antecedentes.
+
+Rasterização de alertas, reamostragem de K e gravação de GeoTIFF dependem do GDAL do QGIS e não foram executadas.
 
 **Não houve execução nativa no QGIS.** Leitura de camadas, interseções, passa-baixa geométrico, média de K em raster, gravação do GeoPackage e estilo precisam ser conferidos na primeira execução.
