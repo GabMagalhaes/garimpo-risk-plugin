@@ -11,7 +11,8 @@ grava `<prefixo>_K.tif`, e o modelo dinâmico o lê como qualquer outro
 raster. Nenhum dos dois importa o código do outro.
 
 `escrever` grava também `<prefixo>_registro.json`, com a configuração, a
-identificação dos insumos e as saídas (ver `registro.py`).
+identificação dos insumos e as saídas (ver `registro.py`). O registro
+anterior é apagado antes da primeira saída.
 """
 
 import os
@@ -154,6 +155,9 @@ def preparar(config, registrar=None):
         vetoriais.append(_registro.descrever_camada(
             config.camada_subbacias, "subbacias",
             campo_id=config.campo_id_subbacia))
+        if vetoriais[-1]["alteracoes_nao_salvas"]:
+            log("AVISO: a camada de sub-bacias tem edições não salvas; o "
+                "registro identifica o arquivo em disco.")
 
     return {"grade": grade, "caminhos": caminhos, "pesos": pesos,
             "nomes": nomes, "config": config, "vetoriais": vetoriais,
@@ -168,11 +172,13 @@ _INSUMOS = (("PGgeom", "caminho_ibx"), ("Est", "caminho_est"),
             ("mascara", "caminho_mascara"), ("agua", "caminho_agua"))
 
 
-def _identificar_insumos(config, vetoriais):
+def _identificar_insumos(config, vetoriais, interromper=None):
     """Identidade dos arquivos de entrada (SHA-256). Segundo plano."""
-    insumos = [_registro.descrever_arquivo(getattr(config, atributo), papel)
+    insumos = [_registro.descrever_arquivo(getattr(config, atributo), papel,
+                                           interromper)
                for papel, atributo in _INSUMOS if getattr(config, atributo)]
-    return insumos + [_registro.identificar(v) for v in vetoriais]
+    return insumos + [_registro.identificar(v, interromper)
+                      for v in vetoriais]
 
 
 # ----------------------------------------------------------------- fase 2
@@ -280,10 +286,14 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
                else "fixado na configuração"))
     passo(95)
     try:
-        insumos = _identificar_insumos(config, preparado.get("vetoriais", []))
+        insumos = _identificar_insumos(config, preparado.get("vetoriais", []),
+                                       cancelado)
+    except _registro.Interrompido:
+        raise SimulacaoCancelada()
     except Exception as erro:  # noqa: BLE001 - registro não derruba o cálculo
         log("AVISO: não foi possível identificar os insumos: %s" % erro)
         insumos = []
+    passo(98)
     return {"resultado": resultado, "grade": grade, "dentro": dentro,
             "config": config, "mu": mu, "mu_anterior": mu_anterior,
             "remanescente": R, "totais": totais, "insumos": insumos,
@@ -304,6 +314,11 @@ def escrever(calculado, registrar=None):
             registrar(msg)
 
     os.makedirs(config.pasta_saida, exist_ok=True)
+    erro = _registro.remover(caminho_de_saida(config, "registro", "json"))
+    if erro:
+        log("AVISO: não foi possível apagar o registro anterior (%s); se a "
+            "gravação do novo também falhar, ele não descreve esta "
+            "execução." % erro)
     gravados = []
     saidas = {}
 

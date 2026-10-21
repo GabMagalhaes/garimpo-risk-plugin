@@ -7,8 +7,11 @@ tamanho, data de modificação e SHA-256) e os arquivos gravados. É o que
 permite dizer, meses depois, de que versão das bases saiu um mapa — e
 repetir a execução.
 
-O registro é sobrescrito a cada execução, como as próprias saídas: o JSON
-de uma pasta descreve sempre os arquivos que estão nela.
+O registro é sobrescrito a cada execução com o mesmo nome, como as próprias
+saídas, e descreve os arquivos listados em ``saidas``. As orquestrações
+apagam o registro anterior antes de gravar a primeira saída: se a execução
+falhar no meio, a pasta fica sem registro, e não com um registro de outra
+execução ao lado de saídas novas.
 
 Este módulo não importa QGIS nem GDAL. Camadas vetoriais são descritas por
 ``descrever_camada``, que só chama métodos da própria camada e por isso
@@ -23,6 +26,9 @@ import json
 import math
 import os
 import platform
+import re
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import numpy as np
 
@@ -34,21 +40,31 @@ _BLOCO = 1 << 20
 _COMPLEMENTOS_SHP = (".dbf", ".shx", ".prj", ".cpg")
 
 
+class Interrompido(Exception):
+    """O cálculo do SHA-256 foi interrompido a pedido (cancelamento)."""
+
+
 def agora():
     """Instante atual, com fuso, em ISO 8601."""
     return _dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def sha256(caminho):
-    """SHA-256 do arquivo, lido em blocos (rasters podem ter gigabytes)."""
+def sha256(caminho, interromper=None):
+    """SHA-256 do arquivo, lido em blocos (rasters podem ter gigabytes).
+
+    ``interromper()`` é consultado a cada bloco; devolvendo verdadeiro, a
+    leitura para com ``Interrompido``.
+    """
     resumo = hashlib.sha256()
     with open(caminho, "rb") as arquivo:
         for bloco in iter(lambda: arquivo.read(_BLOCO), b""):
+            if interromper is not None and interromper():
+                raise Interrompido(caminho)
             resumo.update(bloco)
     return resumo.hexdigest()
 
 
-def _identidade(caminho):
+def _identidade(caminho, interromper=None):
     if not caminho or not os.path.isfile(caminho):
         return {"existe": False}
     estado = os.stat(caminho)
@@ -56,34 +72,36 @@ def _identidade(caminho):
     return {"existe": True,
             "tamanho_bytes": int(estado.st_size),
             "modificado_em": modificado.isoformat(timespec="seconds"),
-            "sha256": sha256(caminho)}
+            "sha256": sha256(caminho, interromper)}
 
 
-def identificar(insumo):
+def identificar(insumo, interromper=None):
     """Completa um insumo com a identidade do arquivo em ``insumo["caminho"]``.
 
     Não falha quando o caminho não é um arquivo local (camada em memória,
-    fonte remota): marca ``existe = False`` e segue.
+    banco de dados, serviço, arquivo compactado): marca ``existe = False`` e
+    segue.
     """
     insumo = dict(insumo)
     caminho = insumo.get("caminho")
-    insumo.update(_identidade(caminho))
+    insumo.update(_identidade(caminho, interromper))
     if caminho and os.path.splitext(caminho)[1].lower() == ".shp":
         base = os.path.splitext(caminho)[0]
         complementos = []
         for extensao in _COMPLEMENTOS_SHP:
             for candidato in (base + extensao, base + extensao.upper()):
                 if os.path.isfile(candidato):
-                    complementos.append(dict(caminho=candidato,
-                                             **_identidade(candidato)))
+                    complementos.append(dict(
+                        caminho=candidato,
+                        **_identidade(candidato, interromper)))
                     break
         insumo["complementos"] = complementos
     return insumo
 
 
-def descrever_arquivo(caminho, papel):
+def descrever_arquivo(caminho, papel, interromper=None):
     """Insumo raster (ou qualquer arquivo) identificado pelo conteúdo."""
-    return identificar({"papel": papel, "caminho": caminho})
+    return identificar({"papel": papel, "caminho": caminho}, interromper)
 
 
 def descrever_camada(camada, papel, **extra):
@@ -91,17 +109,48 @@ def descrever_camada(camada, papel, **extra):
 
     ``caminho`` é o arquivo por trás da camada, quando há um; a identidade
     (tamanho, SHA-256) fica para ``identificar``, fora da thread principal.
+    ``fonte`` vem de ``publicSource``, que omite senhas de bancos e
+    serviços: o registro é feito para acompanhar os mapas.
     """
     fonte = str(camada.source())
-    arquivo = fonte.split("|")[0]
+    publica = getattr(camada, "publicSource", None)
+    editavel = getattr(camada, "isEditable", None)
+    modificada = getattr(camada, "isModified", None)
     descricao = {"papel": papel,
                  "nome": str(camada.name()),
-                 "fonte": fonte,
-                 "caminho": arquivo if os.path.isfile(arquivo) else None,
+                 "fonte": str(publica()) if publica else fonte,
+                 "caminho": _arquivo_da_camada(camada, fonte),
                  "crs": str(camada.crs().authid()),
-                 "feicoes": int(camada.featureCount())}
+                 "feicoes": int(camada.featureCount()),
+                 # featureCount e os eventos incluem o buffer de edição;
+                 # o SHA-256 identifica só o arquivo em disco
+                 "alteracoes_nao_salvas": bool(editavel and modificada
+                                               and editavel()
+                                               and modificada())}
     descricao.update(extra)
     return descricao
+
+
+def _arquivo_da_camada(camada, fonte):
+    """Arquivo local por trás de uma camada vetorial, ou ``None``."""
+    candidatos = []
+    try:
+        from qgis.core import QgsProviderRegistry
+        partes = QgsProviderRegistry.instance().decodeUri(
+            camada.providerType(), fonte)
+        candidatos.append(partes.get("path"))
+    except Exception:  # noqa: BLE001 - fora do QGIS, ou provedor sem path
+        pass
+    candidatos.append(fonte.split("|")[0])                    # OGR
+    if fonte.startswith("file:"):                          # texto delimitado
+        candidatos.append(url2pathname(urlparse(fonte).path))
+    banco = re.search(r"dbname='([^']+)'", fonte)              # SpatiaLite
+    if banco:
+        candidatos.append(banco.group(1))
+    for candidato in candidatos:
+        if candidato and os.path.isfile(candidato):
+            return candidato
+    return None
 
 
 def configuracao_simples(objeto, excluir=()):
@@ -192,12 +241,29 @@ def montar(ferramenta, configuracao, grade, insumos, saidas, parametros=None,
 def gravar(caminho, registro):
     """Grava o registro em JSON (UTF-8). A troca do arquivo é atômica."""
     temporario = caminho + ".tmp"
-    with open(temporario, "w", encoding="utf-8") as arquivo:
-        json.dump(_limpar(registro), arquivo, ensure_ascii=False, indent=2,
-                  allow_nan=False)
-        arquivo.write("\n")
-    os.replace(temporario, caminho)
+    try:
+        with open(temporario, "w", encoding="utf-8") as arquivo:
+            json.dump(_limpar(registro), arquivo, ensure_ascii=False,
+                      indent=2, allow_nan=False)
+            arquivo.write("\n")
+        os.replace(temporario, caminho)
+    finally:
+        if os.path.exists(temporario):
+            try:
+                os.remove(temporario)
+            except OSError:
+                pass
     return caminho
+
+
+def remover(caminho):
+    """Apaga um registro anterior. Devolve a mensagem de erro, se houver."""
+    try:
+        if os.path.exists(caminho):
+            os.remove(caminho)
+    except OSError as erro:
+        return str(erro)
+    return None
 
 
 def ler(caminho):

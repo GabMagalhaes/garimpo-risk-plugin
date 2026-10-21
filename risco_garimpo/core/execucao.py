@@ -20,7 +20,8 @@ com a API vetorial do QGIS.
 
 Ao fim de ``executar`` grava-se o registro da execução
 (``<prefixo>_registro_<data>.json``, ver ``registro.py``); ``agregar`` o
-completa com o GeoPackage por sub-bacia.
+completa com o GeoPackage por sub-bacia. O registro anterior com o mesmo
+nome é apagado antes da primeira saída.
 """
 
 import datetime as _dt
@@ -218,6 +219,12 @@ def preparar(config, log=None):
         insumos.append(_registro.descrever_camada(
             config.camada_subbacias, "subbacias",
             campo_id=config.campo_id_subbacias))
+    for insumo in insumos:
+        if insumo["alteracoes_nao_salvas"]:
+            _log("AVISO: a camada \"%s\" tem edições não salvas. O modelo usa "
+                 "as feições editadas, mas o registro identifica o arquivo "
+                 "em disco. Salve as edições para que a execução possa ser "
+                 "repetida." % insumo["nome"])
 
     return Preparo(grade, janelas_alertas, janelas_fisc, resumo,
                    insumos=insumos, eventos=eventos, inicio=inicio)
@@ -297,6 +304,11 @@ def executar(config, preparo, progresso=None, log=None):
     resultado.diagnostico.update(preparo.resumo)
 
     _passo(0.90, "Gravando rasters")
+    erro = _registro.remover(caminho_de_registro(config))
+    if erro:
+        _log("AVISO: não foi possível apagar o registro anterior (%s); se a "
+             "gravação do novo também falhar, ele não descreve esta "
+             "execução." % erro)
     saidas = _gravar(config, grade, resultado, K, mascara)
     _passo(0.95, "Gravando o registro da execução")
     caminho_registro = _registrar(config, preparo, saidas,
@@ -408,8 +420,14 @@ def _gravar(config, grade, resultado, K, mascara):
 
 
 # --------------------------------------------------- fase 3 (thread principal)
-def agregar(config, grade, resultado, progresso=None, log=None):
-    """Agrega por sub-bacia e grava o GeoPackage. Thread principal."""
+def agregar(config, grade, resultado, progresso=None, log=None,
+            registro=None):
+    """Agrega por sub-bacia e grava o GeoPackage. Thread principal.
+
+    ``registro`` é o caminho devolvido por ``executar`` nesta mesma
+    execução; ``None`` (registro não gravado) deixa a pasta como está, para
+    não completar o registro de outra execução.
+    """
     if config.camada_subbacias is None:
         return None, None
     from .agregacao import agregar_resultado
@@ -420,8 +438,7 @@ def agregar(config, grade, resultado, progresso=None, log=None):
                                   config.data_fim.strftime("%Y%m%d")))
     tabela = agregar_resultado(resultado, grade, config.camada_subbacias,
                                config.campo_id_subbacias, caminho, progresso)
-    registro = caminho_de_registro(config)
-    if os.path.isfile(registro):
+    if registro and os.path.isfile(registro):
         try:
             _registro.acrescentar(registro, {"subbacias": caminho},
                                   {"subbacias": len(tabela)})

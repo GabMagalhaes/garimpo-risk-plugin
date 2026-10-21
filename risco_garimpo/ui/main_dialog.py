@@ -352,7 +352,8 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
             try:
                 self._etapa("Agregando por sub-bacia…")
                 caminho, tabela = agregar(self._config_atual, grade, resultado,
-                                          log=self._registrar)
+                                          log=self._registrar,
+                                          registro=saida.get("registro"))
                 if caminho:
                     saidas["subbacias"] = caminho
                     self._registrar("Sub-bacias agregadas: %s" % caminho)

@@ -29,12 +29,24 @@ class _Crs(object):
 class _CamadaFalsa(object):
     """O mínimo da API de QgsVectorLayer que o registro consulta."""
 
-    def __init__(self, fonte, nome="camada", feicoes=3, crs="EPSG:31981"):
+    def __init__(self, fonte, nome="camada", feicoes=3, crs="EPSG:31981",
+                 publica=None, editada=False):
         self._fonte, self._nome = fonte, nome
         self._feicoes, self._crs = feicoes, crs
+        self._publica = publica
+        self._editada = editada
 
     def source(self):
         return self._fonte
+
+    def publicSource(self):  # noqa: N802 - API do QGIS
+        return self._fonte if self._publica is None else self._publica
+
+    def isEditable(self):  # noqa: N802 - API do QGIS
+        return self._editada
+
+    def isModified(self):  # noqa: N802 - API do QGIS
+        return self._editada
 
     def name(self):
         return self._nome
@@ -100,6 +112,39 @@ def test_camada_de_geopackage_aponta_para_o_arquivo(tmp_path):
         hashlib.sha256(b"gpkg").hexdigest()
 
 
+def test_fonte_gravada_nao_leva_a_senha():
+    """O registro acompanha os mapas: senha de banco não pode ir junto."""
+    fonte = ("dbname='ibama' host=10.0.0.1 user='analista' "
+             "password='segredo' table=\"public\".\"autos\" (geom)")
+    camada = _CamadaFalsa(fonte, publica=fonte.replace(
+        " password='segredo'", ""))
+    descricao = registro.descrever_camada(camada, "fiscalizacao")
+    assert "segredo" not in json.dumps(descricao)
+    assert "dbname='ibama'" in descricao["fonte"]
+
+
+def test_texto_delimitado_e_spatialite_apontam_para_o_arquivo(tmp_path):
+    csv = tmp_path / "autos de infração.csv"
+    csv.write_text("x;y;data\n", encoding="utf-8")
+    fonte = csv.as_uri() + "?type=csv&delimiter=;&xField=x&yField=y"
+    descricao = registro.descrever_camada(_CamadaFalsa(fonte), "fiscalizacao")
+    assert descricao["caminho"] == str(csv)
+
+    banco = tmp_path / "eventos.sqlite"
+    banco.write_bytes(b"sqlite")
+    descricao = registro.descrever_camada(
+        _CamadaFalsa("dbname='%s' table=\"alertas\" (geom)" % banco),
+        "alertas")
+    assert descricao["caminho"] == str(banco)
+
+
+def test_edicoes_nao_salvas_ficam_marcadas():
+    assert registro.descrever_camada(
+        _CamadaFalsa("x", editada=True), "alertas")["alteracoes_nao_salvas"]
+    assert not registro.descrever_camada(
+        _CamadaFalsa("x"), "alertas")["alteracoes_nao_salvas"]
+
+
 def test_camada_em_memoria_nao_tem_arquivo():
     camada = _CamadaFalsa("Point?crs=EPSG:31981", nome="tmp")
     descricao = registro.descrever_camada(camada, "alertas")
@@ -143,6 +188,17 @@ def test_json_aceita_numpy_datas_e_nao_finitos(tmp_path):
     assert lido["parametros"] == dataclasses.asdict(Parametros())
     assert lido["grade"]["nx"] == 40 and lido["grade"]["pixel_m"] == 100.0
     assert not os.path.exists(caminho + ".tmp")
+
+
+def test_falha_na_troca_nao_deixa_temporario(monkeypatch, tmp_path):
+    def negar(origem, destino):
+        raise PermissionError("arquivo em uso")
+
+    monkeypatch.setattr(registro.os, "replace", negar)
+    caminho = str(tmp_path / "r.json")
+    with pytest.raises(PermissionError):
+        registro.gravar(caminho, {"a": 1})
+    assert os.listdir(str(tmp_path)) == []
 
 
 def test_versao_vem_do_metadata():
@@ -279,14 +335,17 @@ def test_preparar_registra_camadas_e_eventos(monkeypatch, tmp_path):
     cfg = _config_dinamica(
         tmp_path,
         camada_alertas=_CamadaFalsa(str(gpkg) + "|layername=a",
-                                    nome="alertas", feicoes=6),
+                                    nome="alertas", feicoes=6, editada=True),
         campo_data_alertas="data_det",
         camada_fiscalizacao=_CamadaFalsa("Point?crs=EPSG:31981",
                                          nome="autos", feicoes=2),
         campo_data_fiscalizacao="data_auto")
-    preparo = mod.preparar(cfg)
+    mensagens = []
+    preparo = mod.preparar(cfg, log=mensagens.append)
 
     assert preparo.inicio is not None
+    assert any("AVISO" in m and "edições não salvas" in m and "alertas" in m
+               for m in mensagens)
     papeis = {i["papel"]: i for i in preparo.insumos}
     assert papeis["alertas"]["caminho"] == str(gpkg)
     assert papeis["alertas"]["campo_data"] == "data_det"
@@ -311,12 +370,54 @@ def test_agregar_completa_o_registro(monkeypatch, tmp_path):
     monkeypatch.setattr(agregacao, "agregar_resultado",
                         lambda *a, **k: [{"id": 1}, {"id": 2}, {"id": 3}])
     cfg.camada_subbacias = _CamadaFalsa("Polygon?crs=EPSG:31981")
-    caminho, tabela = agregar(cfg, grade, saida["resultado"])
+    caminho, tabela = agregar(cfg, grade, saida["resultado"],
+                              registro=saida["registro"])
 
     lido = registro.ler(caminho_de_registro(cfg))
     assert lido["saidas"]["subbacias"] == caminho
     assert lido["saidas"]["expansao"]                 # o resto continua lá
     assert lido["resultados"]["subbacias"] == 3
+
+
+def test_agregar_nao_completa_registro_de_outra_execucao(monkeypatch,
+                                                         tmp_path):
+    """Sem registro desta execução, o JSON que estiver na pasta é de outra."""
+    import risco_garimpo.core.agregacao as agregacao
+    from risco_garimpo.core.execucao import agregar, caminho_de_registro
+
+    cfg = _config_dinamica(tmp_path)
+    os.makedirs(cfg.pasta_saida)
+    antigo = registro.gravar(caminho_de_registro(cfg), {"inicio": "OUTRA"})
+    monkeypatch.setattr(agregacao, "agregar_resultado",
+                        lambda *a, **k: [{"id": 1}])
+    cfg.camada_subbacias = _CamadaFalsa("Polygon?crs=EPSG:31981")
+    agregar(cfg, _grade(), None, registro=None)
+    assert registro.ler(antigo) == {"inicio": "OUTRA"}
+
+
+def test_falha_no_meio_nao_deixa_registro_antigo(monkeypatch, tmp_path):
+    """Saídas novas ao lado do registro de outra execução enganam o leitor."""
+    from risco_garimpo.core import raster as _raster
+    from risco_garimpo.core.execucao import (Preparo, caminho_de_registro,
+                                             executar)
+
+    grade = _grade()
+    _aparelhar_dinamico(monkeypatch, grade)
+    cfg = _config_dinamica(tmp_path, salvar_mu_final=True)
+    os.makedirs(cfg.pasta_saida)
+    registro.gravar(caminho_de_registro(cfg), {"inicio": "OUTRA"})
+    chamadas = []
+
+    def escrever(caminho, arr, g, **kw):
+        chamadas.append(caminho)
+        if len(chamadas) == 2:
+            raise PermissionError("arquivo em uso: %s" % caminho)
+        return caminho
+
+    monkeypatch.setattr(_raster, "escrever_raster", escrever)
+    with pytest.raises(PermissionError):
+        executar(cfg, Preparo(grade))
+    assert not os.path.exists(caminho_de_registro(cfg))
 
 
 # ------------------------------------------------------- modelo estático
@@ -352,6 +453,63 @@ def test_escrita_estatica_grava_o_registro(monkeypatch, tmp_path):
     assert 0.0 < lido["resultados"]["teto_estimado"] <= 1.0
     assert lido["resultados"]["variaveis"] == {"PGgeom": cfg.peso_ibx}
     assert lido["grade"]["geotransform"] is None   # grade falsa, sem gt
+
+
+def test_falha_no_meio_da_escrita_estatica_nao_deixa_registro_antigo(
+        monkeypatch, tmp_path):
+    import risco_garimpo.core.execucao_estatica as mod
+
+    from test_execucao_estatica import _GradeFalsa, _aparelhar, _mundo
+
+    grade = _GradeFalsa(nx=80, ny=80)
+    pggeom, mu = _mundo(grade)
+    _aparelhar(monkeypatch, mod, grade,
+               {"/dados/pggeom.tif": pggeom, "/dados/mu.tif": mu})
+    cfg = mod.ConfiguracaoEstatica(
+        caminho_ibx="/dados/pggeom.tif", caminho_mu="/dados/mu.tif",
+        pasta_saida=str(tmp_path / "saida"), prefixo="PMT", n_faixas=20,
+        minimo_por_faixa=50, salvar_tabela=False)
+    os.makedirs(cfg.pasta_saida)
+    antigo = registro.gravar(mod.caminho_de_saida(cfg, "registro", "json"),
+                             {"inicio": "OUTRA"})
+    chamadas = []
+
+    def escrever(caminho, arr, g, **kw):
+        chamadas.append(caminho)
+        if len(chamadas) == 2:
+            raise PermissionError("arquivo em uso: %s" % caminho)
+        return caminho
+
+    monkeypatch.setattr(mod, "escrever_raster", escrever)
+    with pytest.raises(PermissionError):
+        mod.escrever(mod.executar(mod.preparar(cfg)))
+    assert not os.path.exists(antigo)
+
+
+def test_cancelar_durante_o_hash_interrompe(monkeypatch, tmp_path):
+    """Sem isso, cancelar na fase do SHA-256 ainda gravaria as saídas."""
+    import risco_garimpo.core.execucao_estatica as mod
+
+    from test_execucao_estatica import _GradeFalsa, _aparelhar, _mundo
+
+    grade = _GradeFalsa(nx=80, ny=80)
+    pggeom, mu = _mundo(grade)
+    ibx = tmp_path / "pggeom.tif"
+    ibx.write_bytes(b"x" * 1024)
+    _aparelhar(monkeypatch, mod, grade, {str(ibx): pggeom, "/dados/mu.tif": mu})
+    estado = {"cancelar": False}
+    original = registro.sha256
+
+    def sha256(caminho, interromper=None):
+        estado["cancelar"] = True                 # o usuário clica Cancelar
+        return original(caminho, interromper)
+
+    monkeypatch.setattr(registro, "sha256", sha256)
+    cfg = mod.ConfiguracaoEstatica(
+        caminho_ibx=str(ibx), caminho_mu="/dados/mu.tif",
+        pasta_saida=str(tmp_path / "saida"), n_faixas=20, minimo_por_faixa=50)
+    with pytest.raises(mod.SimulacaoCancelada):
+        mod.executar(mod.preparar(cfg), cancelado=lambda: estado["cancelar"])
 
 
 def test_falha_no_registro_estatico_nao_derruba_a_escrita(monkeypatch,
