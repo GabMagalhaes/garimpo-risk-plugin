@@ -34,6 +34,8 @@ gerar_e_carregar(r"C:\Plugin\teste")
 
 Selecione as camadas e os campos de data, defina o período de **01/01/2025 a 31/12/2026** e execute o modelo dinâmico. A mensagem **“Agrupados em 6 frentes”** é o resultado esperado para esse conjunto de teste.
 
+Para testar o plugin instalado sem abrir os diálogos, troque a segunda linha por `testar_ponta_a_ponta(r"C:\Plugin\teste")`. A função gera os dados, cria quatro sub-bacias de teste, roda os dois modelos com o código do plugin instalado, grava as saídas em `teste\saidas` e confere os registros de execução. A última linha deve ser **“TUDO CERTO: os dois registros têm o esperado.”**
+
 Se houver falha, consulte o registro de execução. Nos dados reais, confira inicialmente projeção, extensão, campos de data e alinhamento das camadas.
 
 ## Insumos e configuração
@@ -345,7 +347,7 @@ Os caminhos do núcleo são relativos à pasta `risco_garimpo/`. As responsabili
 
 Cada ferramenta organiza o trabalho em três fases: **preparar**, na thread principal, acessa as camadas do projeto; **executar**, em segundo plano, realiza os cálculos; **agregar/escrever**, na thread principal, finaliza as saídas.
 
-A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy.
+A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu e roda também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais; fora desse ambiente, esse teste é pulado.
 
 O arquivo `tests/test_contrato_ui.py` verifica os componentes utilizados pelos diálogos e a correspondência entre os arquivos de interface e seus geradores.
 

@@ -13,6 +13,15 @@ Como usar, dentro do QGIS (Complementos → Console Python), duas linhas:
 A primeira linha define as funções; a segunda gera os arquivos e já carrega
 as camadas no projeto aberto.
 
+Para testar o plugin instalado de ponta a ponta, sem abrir os diálogos, troque
+a segunda linha por:
+
+    testar_ponta_a_ponta(r"C:\\Plugin\\teste")
+
+Isso gera os dados, roda o modelo dinâmico e o estático com o código do
+plugin instalado, grava as saídas em ``<pasta>\\saidas`` e confere o que cada
+registro de execução (JSON) contém.
+
 Cria, na pasta indicada:
 
     teste_K.tif        favorabilidade sintética (0–1), com áreas de K = 0
@@ -198,6 +207,184 @@ def carregar_no_qgis(saidas):
     print("Camadas carregadas no projeto.")
 
 
+def _gravar_subbacias(pasta, prefixo="teste"):
+    """Quatro quadrantes de 10 × 10 km, com o campo ``nome``."""
+    caminho = os.path.join(pasta, "%s_subbacias.gpkg" % prefixo)
+    if os.path.exists(caminho):
+        os.remove(caminho)
+    fonte = ogr.GetDriverByName("GPKG").CreateDataSource(caminho)
+    camada = fonte.CreateLayer("subbacias", _referencia(), ogr.wkbPolygon)
+    camada.CreateField(ogr.FieldDefn("nome", ogr.OFTString))
+    lado = NX * RES / 2.0
+    for i, (linha, coluna) in enumerate(((0, 0), (0, 1), (1, 0), (1, 1))):
+        x0 = XMIN + coluna * lado
+        y0 = YMAX - linha * lado
+        anel = ogr.Geometry(ogr.wkbLinearRing)
+        for x, y in ((x0, y0), (x0 + lado, y0), (x0 + lado, y0 - lado),
+                     (x0, y0 - lado), (x0, y0)):
+            anel.AddPoint_2D(x, y)
+        poligono = ogr.Geometry(ogr.wkbPolygon)
+        poligono.AddGeometry(anel)
+        feicao = ogr.Feature(camada.GetLayerDefn())
+        feicao.SetGeometry(poligono)
+        feicao.SetField("nome", "SB%d" % (i + 1))
+        camada.CreateFeature(feicao)
+        feicao = None
+    fonte = None
+    return caminho
+
+
+def testar_ponta_a_ponta(pasta=None, prefixo="teste"):
+    """Gera os dados e roda os dois modelos com o plugin instalado.
+
+    Só dentro do QGIS. Não usa os diálogos: chama o núcleo do plugin na
+    mesma ordem em que a interface o chama. O modelo estático usa o K
+    sintético no lugar do PGgeom, só para exercitar o fluxo. Devolve os
+    caminhos dos dois registros de execução e o número de verificações que
+    falharam.
+    """
+    import json
+    import sys
+
+    from qgis.core import QgsVectorLayer
+
+    # descarta módulos do plugin já importados nesta sessão, para usar a
+    # versão instalada agora
+    for nome in [m for m in sys.modules if m.split(".")[0] == "risco_garimpo"]:
+        del sys.modules[nome]
+    try:
+        from risco_garimpo.core import execucao, execucao_estatica, registro
+    except ImportError as erro:
+        print("ERRO: não achei o plugin Risco Garimpo com o registro de "
+              "execução (%s). Instale o ZIP novo em Complementos → "
+              "Gerenciar e instalar complementos → Instalar a partir do ZIP "
+              "e rode de novo." % erro)
+        return None
+    if not hasattr(registro, "remover"):
+        print("ERRO: o plugin instalado é anterior às últimas correções. "
+              "Instale o ZIP novo e reinicie o QGIS.")
+        return None
+
+    pasta = pasta or os.getcwd()
+    dados = gerar(pasta, prefixo)
+    dados["subbacias"] = _gravar_subbacias(pasta, prefixo)
+    pasta_saida = os.path.join(pasta, "saidas")
+
+    def camada(caminho, nome):
+        resultado = QgsVectorLayer("%s|layername=%s" % (caminho, nome), nome,
+                                   "ogr")
+        if not resultado.isValid():
+            raise RuntimeError("camada inválida: %s" % nome)
+        return resultado
+
+    alertas = camada(dados["eventos"], "alertas")
+    autos = camada(dados["eventos"], "autos")
+    subbacias = camada(dados["subbacias"], "subbacias")
+
+    def log(mensagem):
+        print("   " + str(mensagem))
+
+    print("\n=== Modelo dinâmico ===")
+    cfg = execucao.Configuracao(
+        caminho_k=dados["K"], caminho_mu0=dados["mu0"],
+        caminho_mascara=dados["mascara"],
+        camada_alertas=alertas, campo_data_alertas="data",
+        camada_fiscalizacao=autos, campo_data_fiscalizacao="data",
+        camada_subbacias=subbacias, campo_id_subbacias="nome",
+        data_inicio=_dt.date(2025, 1, 1), data_fim=_dt.date(2026, 12, 31),
+        pasta_saida=pasta_saida, prefixo=prefixo)
+    preparo = execucao.preparar(cfg, log=log)
+    saida = execucao.executar(cfg, preparo, log=log)
+    execucao.agregar(cfg, saida["grade"], saida["resultado"], log=log,
+                     registro=saida["registro"])
+
+    print("\n=== Modelo estático ===")
+    cfg_e = execucao_estatica.ConfiguracaoEstatica(
+        caminho_ibx=dados["K"], caminho_mu=dados["mu0"],
+        caminho_mascara=dados["mascara"], pasta_saida=pasta_saida,
+        prefixo=prefixo + "_estatico", resolucao_m=RES,
+        camada_subbacias=subbacias, campo_id_subbacia="nome", carregar=False)
+    calculado = execucao_estatica.executar(
+        execucao_estatica.preparar(cfg_e, registrar=log), registrar=log)
+    execucao_estatica.escrever(calculado, registrar=log)
+
+    registros = {
+        "dinamico": saida["registro"],
+        "estatico": execucao_estatica.caminho_de_saida(cfg_e, "registro",
+                                                       "json"),
+    }
+    falhas = 0
+    for rotulo, caminho in registros.items():
+        falhas += _conferir_registro(rotulo, caminho, json)
+    print("\n%s" % ("TUDO CERTO: os dois registros têm o esperado."
+                     if not falhas else
+                     "%d verificação(ões) falharam — veja acima." % falhas))
+    registros["falhas"] = falhas
+    return registros
+
+
+def _conferir_registro(rotulo, caminho, json):
+    """Imprime o essencial de um registro e confere o esperado."""
+    print("\n=== Registro do modelo %s ===" % rotulo)
+    if not caminho or not os.path.isfile(caminho):
+        print("   FALHOU: registro não gravado (%s)" % caminho)
+        return 1
+    with open(caminho, encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+    print("   arquivo:      %s" % caminho)
+    print("   plugin:       %s   |   QGIS %s, GDAL %s, Python %s"
+          % (dados["versao_plugin"], dados["ambiente"]["qgis"],
+             dados["ambiente"]["gdal"], dados["ambiente"]["python"]))
+    print("   início/fim:   %s  →  %s" % (dados["inicio"], dados["gravado_em"]))
+    print("   insumos:")
+    for insumo in dados["insumos"]:
+        print("     %-12s %s  %s"
+              % (insumo["papel"], (insumo.get("sha256") or "sem SHA-256")[:16],
+                 insumo.get("caminho")))
+    for tipo, info in sorted(dados["eventos"].items()):
+        print("   eventos %-13s %s" % (tipo + ":", info))
+    print("   saídas:       %s" % ", ".join(sorted(dados["saidas"])))
+
+    insumos = {i["papel"]: i for i in dados["insumos"]}
+    if rotulo == "dinamico":
+        esperado = [
+            ("K, μ₀ e máscara identificados por SHA-256",
+             all(insumos.get(p, {}).get("sha256")
+                 for p in ("K", "mu0", "mascara"))),
+            ("alertas e autos identificados por SHA-256",
+             all(insumos.get(p, {}).get("sha256")
+                 for p in ("alertas", "fiscalizacao"))),
+            ("150 alertas agrupados em 6 frentes",
+             dados["eventos"].get("alertas", {}).get("lidos") == 150
+             and dados["eventos"]["alertas"].get("frentes") == 6),
+            ("12 autos lidos",
+             dados["eventos"].get("fiscalizacao", {}).get("lidos") == 12),
+            ("parâmetros do modelo registrados",
+             dados["parametros"].get("fisc_plato_dias") is not None),
+            ("GeoPackage por sub-bacia acrescentado",
+             "subbacias" in dados["saidas"]
+             and dados["resultados"].get("subbacias") == 4),
+        ]
+    else:
+        esperado = [
+            ("PGgeom, μ e máscara identificados por SHA-256",
+             all(insumos.get(p, {}).get("sha256")
+                 for p in ("PGgeom", "mu", "mascara"))),
+            ("sub-bacias identificadas por SHA-256",
+             bool(insumos.get("subbacias", {}).get("sha256"))),
+            ("K gravado e teto registrado",
+             "K" in dados["saidas"]
+             and dados["resultados"].get("teto_estimado") is not None),
+            ("GeoPackage por sub-bacia gravado",
+             "subbacias" in dados["saidas"]),
+        ]
+    falhas = 0
+    for descricao, ok in esperado:
+        print("   %s  %s" % ("OK     " if ok else "FALHOU ", descricao))
+        falhas += 0 if ok else 1
+    return falhas
+
+
 def gerar_e_carregar(pasta=None, prefixo="teste"):
     """Atalho para o console do QGIS: gera os arquivos e já os carrega."""
     saidas = gerar(pasta, prefixo)
@@ -215,3 +402,5 @@ else:
     # silêncio, parecendo que falhou.
     print("gerar_dados_teste carregado — nada foi gerado ainda.")
     print("  Rode:  gerar_e_carregar(r'C:\\Users\\<voce>\\Output\\teste')")
+    print("  ou, para testar o plugin de ponta a ponta:")
+    print("         testar_ponta_a_ponta(r'C:\\Users\\<voce>\\Output\\teste')")

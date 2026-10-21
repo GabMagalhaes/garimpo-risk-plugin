@@ -168,5 +168,6 @@ def agregar_potencial(K, mu, grade, camada_zonas, mu_anterior=None,
         linhas.append(linha)
 
     if caminho_saida:
-        _escrever_gpkg(caminho_saida, camada_zonas, feicoes, linhas)
+        _escrever_gpkg(caminho_saida, camada_zonas, feicoes, linhas,
+                       nome_camada="potencial_subbacias")
     return linhas

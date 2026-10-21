@@ -29,3 +29,21 @@ jobs:
           fi
       - name: Rodar testes
         run: python -m pytest tests -q
+
+  qgis:
+    # Roda com o QGIS e a GDAL de verdade, inclusive o roteiro ponta a ponta
+    # (tests/test_qgis_ponta_a_ponta.py), que os dublês não substituem.
+    runs-on: ubuntu-24.04
+    name: QGIS 3.34 do Ubuntu (ponta a ponta)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar QGIS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-qgis python3-gdal python3-pytest qgis-providers
+      - name: Rodar testes
+        env:
+          QT_QPA_PLATFORM: offscreen
+          EXIGIR_QGIS: "1"
+        run: /usr/bin/python3 -m pytest tests -q
