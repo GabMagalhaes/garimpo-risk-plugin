@@ -291,11 +291,24 @@ Também podem ser gravados a ocupação final, a taxa instantânea, os campos de
 | `rg_exp_ha` | Área de expansão simulada. | ha |
 | `rg_mu0_ha` | Área de ocupação inicial. | ha |
 | `rg_muf_ha` | Área de ocupação final. | ha |
-| `rg_exp_rel` | Indicador de expansão relativa. O denominador precisa ser identificado na rotina de agregação para interpretar esse campo. | Adimensional |
-| `rg_px` | Contagem de pixels utilizada na agregação. | Pixels |
-| `rg_rank` | Posição da sub-bacia na ordenação da saída. | Posição |
+| `rg_exp_rel` | Expansão relativa ao estoque inicial: `rg_exp_ha / rg_mu0_ha`. Vale `−1` sempre que a sub-bacia não tinha ocupação inicial, com ou sem expansão; nesse caso, a expansão é chegada em área virgem, por contágio de sub-bacias vizinhas ou por semeadura de alertas. Filtre esse valor antes de ordenar ou classificar o campo. | Adimensional |
+| `rg_px` | Pixels da grade de trabalho atribuídos à sub-bacia, incluindo os excluídos da simulação por `K = 0` ou pela máscara. | Pixels |
+| `rg_rank` | Posição na ordenação por `rg_exp_ha` decrescente; 1 é a maior expansão. Empates mantêm a ordem das feições na camada. | Posição |
 
-Fonte dos nomes de campos: [P1]; rotina indicada: `core/agregacao.py`. O README de origem lista os campos dinâmicos sem detalhar o denominador de `rg_exp_rel` e os critérios de `rg_px` e `rg_rank`.
+Um pixel pertence à sub-bacia que contém o seu centro; onde polígonos se sobrepõem, vale o último. A ocupação inicial de `rg_mu0_ha` é a que a simulação usou: truncada em `K` e zerada onde `K = 0` ou fora da máscara. A área de cada pixel é a da grade de trabalho. Rotina: `core/agregacao.py`.
+
+### Registro da execução
+
+Cada execução grava, na pasta de saída, um arquivo JSON que permite identificar e repetir o que foi rodado:
+
+| Ferramenta | Arquivo |
+|---|---|
+| Modelo dinâmico | `<prefixo>_registro_<data final>.json` |
+| Modelo estático | `<prefixo>_registro.json` |
+
+O registro contém a versão do plugin e das bibliotecas (Python, NumPy, SciPy, GDAL e QGIS), a configuração da interface, os parâmetros do modelo, a grade de trabalho e os arquivos gravados. Cada insumo é identificado pelo caminho, pelo tamanho, pela data de modificação e pelo SHA-256 do conteúdo; um shapefile inclui também `.dbf`, `.shx`, `.prj` e `.cpg`. Camadas vetoriais registram ainda o nome, a fonte, o CRS, o número de feições e o campo de data. No modelo dinâmico entram as contagens de alertas e autos lidos, descartados e fora da grade, as frentes e o período dos eventos; no estático, o teto de `K`, os totais da área de estudo e o diagnóstico de veto.
+
+O arquivo é sobrescrito a cada execução, junto com as saídas, e descreve sempre os arquivos da pasta. Para preservar uma execução, use outro prefixo ou outra pasta. Uma falha ao gravar o registro aparece no registro de execução da interface e não interrompe a gravação das saídas. Rotina: `core/registro.py`.
 
 ## Calibração e verificação
 
@@ -323,6 +336,7 @@ A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_pe
 | `core/estatico.py` | Combinação fuzzy e estimação do nível de capacidade. |
 | `core/execucao.py` | Orquestração do modelo dinâmico. |
 | `core/execucao_estatica.py` | Orquestração do modelo estático. |
+| `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
 | `tools/` | Geração de interfaces, empacotamento e dados de teste. |
 | `tests/` | Testes do núcleo e contratos de interface. |

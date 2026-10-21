@@ -104,22 +104,28 @@ def agregar_resultado(resultado, grade, camada_zonas, campo_id=None,
                       caminho_saida=None, progresso=None):
     """Tabela por sub-bacia com expansão prevista, estoque e ranking.
 
+    Um pixel pertence à sub-bacia que contém o seu centro (``gdal.Rasterize``
+    sem ``allTouched``); onde polígonos se sobrepõem, vale o último.
+
     Colunas geradas:
 
     ``rg_exp_ha``
         expansão prevista no horizonte, em hectares equivalentes
         (Σ Δμ × área do pixel).
     ``rg_mu0_ha`` / ``rg_muf_ha``
-        estoque inicial e final, em hectares equivalentes.
+        estoque inicial e final, em hectares equivalentes. O inicial é o μ₀
+        já preparado pela simulação: truncado em K e zerado onde K = 0 ou
+        fora da máscara.
     ``rg_exp_rel``
-        expansão relativa ao estoque inicial (adimensional; ``-1`` quando não
-        havia estoque, isto é, chegada em área virgem).
-    ``rg_k_ha``
-        capacidade de suporte total da sub-bacia.
-    ``rg_ocup``
-        fração da capacidade já ocupada ao fim do horizonte.
+        expansão relativa ao estoque inicial, ``rg_exp_ha / rg_mu0_ha``
+        (adimensional; ``-1`` quando não havia estoque, isto é, chegada em
+        área virgem).
+    ``rg_px``
+        pixels da grade de trabalho atribuídos à sub-bacia, inclusive os
+        excluídos da simulação (K = 0 ou fora da máscara).
     ``rg_rank``
-        posição no ranking por expansão prevista (1 = maior).
+        posição no ranking por ``rg_exp_ha`` decrescente (1 = maior); empates
+        mantêm a ordem das feições na camada.
     """
     zonas, feicoes = rasterizar_zonas(camada_zonas, grade, progresso)
     n = len(feicoes)
