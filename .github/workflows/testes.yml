@@ -1,0 +1,31 @@
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 corresponde ao Python embarcado no QGIS 3.22 (versão mínima).
+        python: ["3.9", "3.12"]
+        scipy: [com, sem]
+    name: Python ${{ matrix.python }} (${{ matrix.scipy }} SciPy)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.scipy }}" = "com" ]; then
+            pip install -r requirements-dev.txt
+          else
+            pip install numpy pytest
+          fi
+      - name: Rodar testes
+        run: python -m pytest tests -q

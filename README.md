@@ -326,9 +326,12 @@ Os caminhos do núcleo são relativos à pasta `risco_garimpo/`. As responsabili
 
 Cada ferramenta organiza o trabalho em três fases: **preparar**, na thread principal, acessa as camadas do projeto; **executar**, em segundo plano, realiza os cálculos; **agregar/escrever**, na thread principal, finaliza as saídas.
 
+A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy.
+
 O arquivo `tests/test_contrato_ui.py` verifica os componentes utilizados pelos diálogos e a correspondência entre os arquivos de interface e seus geradores.
 
 ```bash
+pip install -r requirements-dev.txt
 python -m pytest tests -q
 python tools/gerar_ui.py
 python tools/gerar_ui_estatico.py
