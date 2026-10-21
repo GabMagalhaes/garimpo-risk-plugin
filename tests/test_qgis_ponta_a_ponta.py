@@ -66,3 +66,36 @@ def test_roteiro_do_console_roda_os_dois_modelos(qgis, tmp_path, monkeypatch):
         campos = [c.name() for c in camada.fields()]
         assert any(c.startswith(prefixo) for c in campos), campos
         assert camada.featureCount() == 4
+
+
+def test_calibracao_da_noite_roda_retoma_e_resume(qgis, tmp_path,
+                                                 monkeypatch):
+    """O roteiro tools/calibrar_noite.py com dados sintéticos, em poucos segundos."""
+    monkeypatch.syspath_prepend(RAIZ)
+    espaco = {"__name__": "__console__"}
+    for arquivo in ("gerar_dados_teste.py", "calibrar_noite.py"):
+        caminho = os.path.join(RAIZ, "tools", arquivo)
+        exec(compile(open(caminho, encoding="utf-8").read(), caminho, "exec"),
+             espaco)
+    dados = espaco["gerar"](str(tmp_path))
+    pasta = str(tmp_path / "calib")
+    espaco["CONFIG"].update(
+        K=dados["K"], MU_INICIAL=dados["mu0"],
+        # o próprio K como "garimpo observado no fim": há garimpo novo
+        MU_FINAL=dados["K"], MASCARA=dados["mascara"],
+        ALERTAS=dados["eventos"] + "|layername=alertas",
+        CAMPO_DATA_ALERTAS="data",
+        AUTOS=dados["eventos"] + "|layername=autos", CAMPO_DATA_AUTOS="data",
+        DATA_INICIAL="2025-01-01", DATA_FINAL="2026-12-31", RESOLUCAO_M=200.0,
+        PASTA_SAIDA=pasta, N_ALEATORIAS=3, HORAS_MAXIMAS=1.0)
+    espaco["verificar"]()
+    espaco["rodar_noite"]()
+    with open(os.path.join(pasta, "resultados.csv"), encoding="utf-8") as f:
+        primeira = f.read()
+    espaco["_CONTEXTO"].clear()
+    espaco["rodar_noite"]()                       # retomada: nada a refazer
+    with open(os.path.join(pasta, "resultados.csv"), encoding="utf-8") as f:
+        assert f.read() == primeira
+    resumo = open(os.path.join(pasta, "resumo.txt"), encoding="utf-8").read()
+    assert "LINHAS DE BASE" in resumo and "PLATÔ" in resumo
+    assert "erro" not in primeira.split("\n", 1)[1].lower()
