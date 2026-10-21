@@ -524,12 +524,12 @@
 <widget class="QLabel" name="lbl_spinFiscEscala">
 <property name="text"><string>Alcance espacial</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>O efeito repressivo se concentra em 0,5–1 km.</string></property>
+<property name="toolTip"><string>Referência sem ajuste formal: o efeito se distingue do placebo até 500 m e não a partir de 1 km.</string></property>
 </widget>
 </item>
 <item row="1" column="1">
 <widget class="QDoubleSpinBox" name="spinFiscEscala">
-<property name="toolTip"><string>O efeito repressivo se concentra em 0,5–1 km.</string></property>
+<property name="toolTip"><string>Referência sem ajuste formal: o efeito se distingue do placebo até 500 m e não a partir de 1 km.</string></property>
 <property name="decimals"><number>0</number></property>
 <property name="minimum"><double>10.0</double></property>
 <property name="maximum"><double>20000.0</double></property>

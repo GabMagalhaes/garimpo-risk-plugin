@@ -61,15 +61,20 @@ Confira o tamanho da **Grade resultante** e a memória estimada por camada antes
 | Parâmetro | Efeito no cálculo | Valor ou procedimento documentado | Fonte |
 |---|---|---|---|
 | Escala de contágio | Controla a distribuição espacial da influência da ocupação existente. | Aproximadamente 380 m. | Resultado da pesquisa citado em [P1] e [P2]. |
-| Alcance da fiscalização | Controla a redução da influência repressiva com a distância ao evento. | 750 m. | Valor informado em [P1]. |
-| Platô da fiscalização | Define a referência temporal para a dissipação do efeito repressivo. | 180 dias. | Valor informado em [P1]. |
+| Alcance da fiscalização | Controla a redução da influência repressiva com a distância ao evento. | 750 m. | Referência na faixa de 0,5–1 km, sem ajuste formal [P3]. |
+| Platô da fiscalização | Define a referência temporal para a dissipação do efeito repressivo. | 180 dias. | Comparação antes/depois e event-study [P3]. |
 | `r₀` | Controla a velocidade básica de expansão. | Ajuste externo com a expansão observada em período conhecido. | Formulação do projeto [P1]. |
 | `α` | Controla a intensidade da ativação por alertas. | Ajuste externo. | Formulação do projeto [P1]. |
 | `F_max` | Controla a redução máxima da taxa de expansão por fiscalização. | Ajuste externo, entre 0 e 1. | Formulação do projeto [P1]. |
 | Piso das variáveis | Define o menor valor admitido nas evidências usadas pelo modelo estático. | Valor configurado na ferramenta estática. | Formulação do projeto [P1]. |
 | Teto fixo | Permite atribuir um nível de capacidade escolhido pelo usuário. | Opção da ferramenta estática; o README de origem menciona o valor 0,70 usado em versão anterior. | Documentação do projeto [P1]. |
 
-Os valores de 750 m e 180 dias são apresentados no README de origem como derivados da análise de eventos da pesquisa. Para documentar sua reprodução, ainda é necessário identificar a tabela, o experimento ou o relatório que produziu essas estimativas. As referências bibliográficas deste documento fundamentam os métodos.
+Os valores da fiscalização vêm do artigo [P3]:
+
+- **Platô de 180 dias.** Janela escolhida pela comparação da área de alertas antes e depois dos autos de infração, em janelas cumulativas de 30 a 360 dias, contra um placebo (Seções 3.6 e 4.2, Figura 1). Nessa janela, a redução é significativa em quatro testes: três não paramétricos e um t pareado (Tabela 1). O event-study em intervalos de 30 dias (Seção 4.5, Figura 3) mostra queda praticamente imediata, patamar no semestre seguinte e perda de distinção em relação ao placebo perto de 180–195 dias. As inclinações `k_subida` e `k_queda` não foram ajustadas.
+- **Alcance de 750 m.** Valor de referência dentro da faixa de 0,5–1 km, lido do gráfico e sem ajuste formal. Com janela fixa de 180 dias e buffers cumulativos de 500 m (Seção 4.4, Figura 2), o efeito se distingue do placebo no buffer de 500 m e deixa de se distinguir a partir de 1 km. O artigo propõe `S(d) = exp(−d/d₀)` (Seção 5.2), mas não estima `d₀`.
+
+As referências bibliográficas deste documento fundamentam os métodos.
 
 ## Modelo estático: construção de K
 
@@ -239,7 +244,7 @@ $$
 T(\Delta t)=\frac{T_{\mathrm{bruto}}(\Delta t)}{T_{\max}}
 $$
 
-Antes do evento, `T = 0`. A normalização faz o pico de `T` corresponder a 1. Para os alertas, o componente temporal documentado é:
+Antes do evento, `T = 0`. A normalização faz o pico de `T` corresponder a 1. Fora dos primeiros dias, essa curva coincide com a forma `T(Δt) = 1/(1 + e^{(Δt − c)/k})` proposta em [P3], com `c = p` e `k = 1/k_queda`; nos valores padrão, `k = 20` dias. Para os alertas, o componente temporal documentado é:
 
 $$
 A_{\mathrm{temporal}}(\Delta t)=e^{-\Delta t/\tau},
@@ -367,6 +372,8 @@ QGIS, NumPy, SciPy, MapBiomas e HydroBASINS são nomes dos softwares ou produtos
 **[P1] Documentação do projeto.** README original “Risco Garimpo (plugin QGIS)”, fornecido para esta revisão. Fonte das equações implementadas, parâmetros informados, opções de interface, arquivos de saída, comandos e organização do código. Os caminhos de código citados neste documento foram extraídos dessa documentação.
 
 **[P2] Documentos da pesquisa.** “Capítulo de Metodologia — Risco de expansão do garimpo no Tapajós”, especialmente as seções de dados e pré-processamento, evidências geomorfológica e estrutural e validação; e capítulo de sistemas complexos da qualificação. Fontes das definições dos indicadores, das bases de dados e da escala local de contágio. As versões das bases devem acompanhar os registros de cada execução.
+
+**[P3] Artigo da pesquisa.** Magalhães, G. C. “Efeito temporal da fiscalização ambiental sobre a expansão do garimpo ilegal: evidências para a parametrização de um modelo dinâmico de risco na Província Mineral do Tapajós”. Artigo submetido ao SICOD 2026. Fonte do platô e do alcance da fiscalização e da forma das funções temporal e espacial.
 
 1. **Esri.** *How Fuzzy Overlay works*. Documentação do ArcGIS Pro. Referência para produto, soma e operador fuzzy gamma. [Texto](https://doc.esri.com/en/arcgis-pro/latest/tool-reference/spatial-analyst/how-fuzzy-overlay-works.html).
 2. **Saaty, T. L. (2008).** Decision making with the analytic hierarchy process. *International Journal of Services Sciences*, 1(1), 83–98. [DOI: 10.1504/IJSSCI.2008.017590](https://doi.org/10.1504/IJSSCI.2008.017590).

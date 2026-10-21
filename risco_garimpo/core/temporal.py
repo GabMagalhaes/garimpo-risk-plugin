@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Funções temporais do modelo dinâmico.
 
-Duas formas distintas, sustentadas pelo event-study:
+Duas formas distintas, sustentadas pelo event-study do artigo SICOD 2026
+(Seção 4.5, Figura 3; ver ``model.py`` para a origem dos valores):
 
 * **Fiscalização** — o efeito repressivo *não* é um decaimento exponencial a
   partir de um pico. Ele sobe quase imediatamente após o auto de infração,
@@ -13,6 +14,8 @@ Duas formas distintas, sustentadas pelo event-study:
   com ``Δt`` em dias desde o evento e ``T(Δt) = 0`` para ``Δt < 0``.
   A curva é normalizada para atingir máximo 1, de modo que o parâmetro
   ``F_max`` do modelo permaneça interpretável como "supressão máxima".
+  Fora dos primeiros dias, coincide com a forma da Seção 5.2 do artigo,
+  ``1/(1 + exp((Δt − c)/k))``, com ``c = platô`` e ``k = 1/k_queda``.
 
 * **Alertas** — a ativação é contínua desde o dia zero e decai
   exponencialmente: ``A(Δt) = exp(-Δt/τ)``.
