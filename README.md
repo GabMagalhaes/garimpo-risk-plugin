@@ -318,10 +318,27 @@ O registro descreve os arquivos listados em `saidas`. Antes da primeira saída, 
 - **Janelas de eventos:** eventos agrupados na mesma janela compartilham uma data de referência. Escolha uma janela compatível com a duração dos efeitos; o projeto exemplifica 30 dias para um platô de 180 dias [P1].
 - **Intensidade dos efeitos:** ajuste `r₀`, `α` e `F_max` com dados observados. A forma das funções temporais e espaciais constitui uma parte da parametrização.
 - **Memória:** muitas janelas em rasters extensos aumentam a demanda. Avalie a resolução e o número de janelas em conjunto com as escalas dos processos.
-- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste. Essa avaliação é uma etapa externa ao plugin [P1, P2].
+- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. As métricas estão em `core/validacao.py`, descritas abaixo; a ferramenta de validação na interface ainda não existe.
 - **Calibração em lote:** `tools/calibrar_noite.py` roda, no Console Python do QGIS, centenas de simulações entre duas datas com mapas de garimpo e compara a expansão prevista com a observada. Primeiro calibra `r₀` para a área nova prevista igualar a observada; depois varia os demais parâmetros, com um fatorial de platô, alcance e `F_max` da fiscalização, e compara o modelo com alternativas sem dinâmica (só `K`, remanescente, proximidade ao garimpo existente). Grava cada simulação num CSV assim que termina, retoma de onde parou e escreve `resumo.txt`. As instruções estão no início do arquivo.
 
 A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_permanentemente`. Ele examina, em um cenário sintético, a persistência de diferenças de trajetória após a fiscalização perder intensidade. A duração e a magnitude dessas diferenças dependem dos parâmetros, da saturação e do horizonte analisado. A interpretação territorial exige comparação com dados observados.
+
+### Métricas de validação
+
+A rotina `core/validacao.py` compara a expansão prevista `Δμ` com o garimpo novo observado no mesmo período, `máx(μ_final − μ_inicial, 0)`, num mapa que o modelo não usou. As métricas respondem a três perguntas:
+
+| Métrica | Pergunta | Leitura | Fonte |
+|---|---|---|---|
+| `auc` | O risco ordena os pixels com garimpo novo acima dos demais? | Probabilidade de um pixel com garimpo novo, acima de um limiar, ter risco maior que um pixel sem. 0,5 é o acaso; 1, a ordenação perfeita. | Curva ROC [6], aplicada a mudança de uso da terra [7]. |
+| `captura_<x>` e curva de captura | Quanto do garimpo novo cai nos `x`% da área de maior risco? | Fração da área nova observada; pesa pelo tamanho do garimpo novo, ao contrário da AUC. | Curva de taxa de sucesso [8]. |
+| `area_sob_captura` | Resumo da curva de captura. | 0,5 é o acaso; tende a 1 quando o garimpo novo se concentra no topo do risco. | [8]. |
+| `razao_area` | O modelo prevê a quantidade certa? | Área nova prevista ÷ observada; 1 é o certo. Calibra `r₀`. | Definição deste documento. |
+| `r_blocos` | O padrão bate em escala mais grossa? | Correlação de Pearson entre as somas em blocos de 1 km, que tolera erros de posição menores que o bloco. | Definição deste documento. |
+| `spearman` e `topo_comum` por sub-bacia | A priorização das sub-bacias acerta? | Correlação de postos entre as áreas previstas e observadas por sub-bacia, e fração das 10% sub-bacias de maior expansão observada que também estão entre as de maior expansão prevista. | Definição deste documento. |
+
+Empates, inevitáveis porque o risco é zero em boa parte da área, são tratados por posto médio na AUC e por rateio proporcional na captura; assim, nenhuma métrica depende da ordem dos pixels no raster. O universo da avaliação é a área de estudo inteira, inclusive onde `K = 0`: garimpo novo fora de `K` é erro do modelo e deve contar.
+
+Para que a comparação tenha sentido, o modelo precisa superar alternativas sem dinâmica, calculadas por `linhas_de_base`: só `K`, o remanescente `K − μ`, a proximidade ao garimpo existente e a proximidade onde ainda há remanescente. A capacidade de antecipação só é medida honestamente com eventos até a data inicial; com os eventos do período inteiro, a avaliação mede a reconstrução do que aconteceu.
 
 ## Desenvolvimento
 
@@ -340,6 +357,7 @@ A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_pe
 | `core/execucao.py` | Orquestração do modelo dinâmico. |
 | `core/execucao_estatica.py` | Orquestração do modelo estático. |
 | `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
+| `core/validacao.py` | Métricas de validação da expansão prevista contra o garimpo novo observado. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
 | `tools/` | Geração de interfaces, empacotamento e dados de teste. |
 | `tests/` | Testes do núcleo e contratos de interface. |
@@ -397,6 +415,9 @@ QGIS, NumPy, SciPy, MapBiomas e HydroBASINS são nomes dos softwares ou produtos
 3. **De Leeuw, J.; Hornik, K.; Mair, P. (2009).** Isotone Optimization in R: Pool-Adjacent-Violators Algorithm (PAVA) and Active Set Methods. *Journal of Statistical Software*, 32(5), 1–24. [DOI: 10.18637/jss.v032.i05](https://doi.org/10.18637/jss.v032.i05).
 4. **Edelstein-Keshet, L. (2005).** *Mathematical Models in Biology*. SIAM, capítulo 4, “An Introduction to Continuous Models”. Referência para modelos de crescimento e saturação. [DOI do capítulo: 10.1137/1.9780898719147.ch4](https://doi.org/10.1137/1.9780898719147.ch4).
 5. **Driscoll, T. A.; Braun, R. J.** *Fundamentals of Numerical Computation*, seção “Euler’s method”, edição on-line dos autores. Referência para integração explícita e erro numérico. [Texto](https://fncbook.github.io/v1.0/ivp/euler.html).
+6. **Fawcett, T. (2006).** An introduction to ROC analysis. *Pattern Recognition Letters*, 27(8), 861–874. [DOI: 10.1016/j.patrec.2005.10.010](https://doi.org/10.1016/j.patrec.2005.10.010).
+7. **Pontius, R. G.; Schneider, L. C. (2001).** Land-cover change model validation by an ROC method for the Ipswich watershed, Massachusetts, USA. *Agriculture, Ecosystems & Environment*, 85(1–3), 239–248. [DOI: 10.1016/S0167-8809(01)00187-6](https://doi.org/10.1016/S0167-8809(01)00187-6).
+8. **Chung, C.-J. F.; Fabbri, A. G. (2003).** Validation of spatial prediction models for landslide hazard mapping. *Natural Hazards*, 30(3), 451–472. [DOI: 10.1023/B:NHAZ.0000007172.62651.2b](https://doi.org/10.1023/B:NHAZ.0000007172.62651.2b).
 
 ## Licença
 
