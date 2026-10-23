@@ -73,3 +73,56 @@ def test_plano_nao_repete_combinacoes_e_tem_ids_estaveis(roteiro):
          and it["etapa"] != "padrao"]
     fiscal = [it for it in plano if it["etapa"] == "fiscal"]
     assert all(it["params"]["r0"] == 0.01 for it in fiscal)
+
+
+def test_etapa_estrutura_nao_muda_os_ids_do_plano_antigo(roteiro):
+    antes = {it["id"] for it in roteiro["_plano_restante"](Parametros(), 0.01)}
+    roteiro["CONFIG"]["ESTRUTURA"] = True
+    depois = roteiro["_plano_restante"](Parametros(), 0.01)
+    assert antes <= {it["id"] for it in depois}
+    estrutura = [it for it in depois if it["etapa"] == "estrutura"]
+    assert estrutura
+    # fator 1 não entra nos parâmetros: o id é o mesmo da versão anterior
+    assert all("k_fator" not in it["params"] or it["params"]["k_fator"] != 1.0
+               for it in estrutura)
+
+
+def test_csv_antigo_aceita_o_plano_antigo_e_recusa_k_fator(roteiro, tmp_path):
+    antigo = [c for c in roteiro["COLUNAS"] if c != "k_fator"]
+    caminho = tmp_path / "resultados.csv"
+    caminho.write_text(";".join(antigo) + "\n", encoding="utf-8")
+    linha = dict.fromkeys(roteiro["COLUNAS"], "")
+    linha.update(id="a", etapa="aleatoria", modo="previsao", auc=0.8)
+    roteiro["_gravar_linha"](linha)
+    assert caminho.read_text(encoding="utf-8").count("\n") == 2
+    linha.update(id="b", etapa="estrutura", k_fator=1.5)
+    with pytest.raises(ValueError):
+        roteiro["_gravar_linha"](linha)
+
+
+def test_fora_da_amostra_escolhe_no_treino_e_mede_no_teste(roteiro, tmp_path):
+    def periodo(nome, aucs, base_auc):
+        pasta = tmp_path / nome
+        pasta.mkdir()
+        roteiro["CONFIG"]["PASTA_SAIDA"] = str(pasta)
+        base = dict.fromkeys(roteiro["COLUNAS"], "")
+        base.update(id="base_proximidade", etapa="linha_de_base",
+                    modo="proximidade", auc=base_auc, captura_5=0.30)
+        roteiro["_gravar_linha"](base)
+        for i, valor in enumerate(aucs):
+            linha = dict.fromkeys(roteiro["COLUNAS"], "")
+            linha.update(id="c%d" % i, etapa="aleatoria", modo="previsao",
+                         auc=valor, captura_5=valor / 2, razao_area=1.0,
+                         r_blocos=0.5, r0=0.001, alerta_peso=1.0,
+                         fisc_max=0.5, fisc_plato_dias=180.0,
+                         fisc_escala_m=750.0, escala_contagio_m=200.0)
+            roteiro["_gravar_linha"](linha)
+        return str(pasta)
+
+    # no treino c3 e c4 são as melhores; no teste, c3 é ótima e c4 péssima
+    treino = periodo("treino", [0.70, 0.71, 0.72, 0.90, 0.89], 0.80)
+    teste = periodo("teste", [0.70, 0.71, 0.72, 0.88, 0.60], 0.80)
+    texto = roteiro["fora_da_amostra"](treino, teste, n=2, imprimir=False)
+    assert "mediana no teste: AUC 0.740" in texto     # média de 0,88 e 0,60
+    assert "NÃO supera" in texto
+    assert os.path.isfile(os.path.join(teste, "fora_da_amostra.txt"))

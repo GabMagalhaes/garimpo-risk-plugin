@@ -33,6 +33,13 @@ próxima segue. Para parar com segurança, crie um arquivo ``PARAR.txt`` na
 PASTA_SAIDA (ou feche o QGIS: o que já foi gravado fica). No Windows, o
 script impede que o computador entre em suspensão enquanto roda.
 
+EM PARALELO E FORA DA AMOSTRA
+-----------------------------
+``calibrar_paralelo.py`` roda o mesmo plano em vários processos, fora do
+QGIS (instruções no arquivo). ``fora_da_amostra(treino, teste)`` compara dois
+períodos rodados com o mesmo plano: escolhe os parâmetros num e mede no
+outro, sem simular nada.
+
 MODOS
 -----
 ``reconstrucao``  usa os alertas e autos de todo o período. Mede se a
@@ -65,43 +72,52 @@ CONFIG = dict(
     # ex.: MapBiomas Mineração de dois anos, só a classe de garimpo
     MU_INICIAL=r"C:\Users\<voce>\dados\garimpo_2022.tif",
     MU_FINAL=r"C:\Users\<voce>\dados\garimpo_2024.tif",
-    MASCARA=None,                  # opcional: raster > 0 = área de estudo
+    # onde a dinâmica roda: a área de estudo + uma faixa em volta (ex.: 5 km),
+    # para que o entorno alimente o contágio na borda; None = grade inteira
+    MASCARA=r"C:\Users\<voce>\dados\mascara_area_buffer5km.tif",
+    # onde as métricas são medidas: só a área de estudo; None = MASCARA
+    MASCARA_AVALIACAO=r"C:\Users\<voce>\dados\mascara_area.tif",
     # eventos: arquivo (.shp, .gpkg ou .gpkg|layername=nome) e campo de data
-    ALERTAS=r"C:\Users\<voce>\dados\alertas_brasil_mais.gpkg",
+    ALERTAS=r"C:\Users\<voce>\dados\alertas.gpkg",
     CAMPO_DATA_ALERTAS="data",
-    AUTOS=r"C:\Users\<voce>\dados\autos_ibama_icmbio.shp",
+    AUTOS=r"C:\Users\<voce>\dados\autos.gpkg",
     CAMPO_DATA_AUTOS="data",
     # período: datas das duas fotografias de garimpo (MU_INICIAL, MU_FINAL)
     DATA_INICIAL="2022-12-31",
     DATA_FINAL="2024-12-31",
-    # resolução da simulação. 150 m é um bom compromisso para a província;
-    # verificar() mostra o tempo por simulação — se passar de ~5 min, suba
+    # resolução da simulação; verificar() mostra o tempo por simulação
     RESOLUCAO_M=150.0,
+    # fora do OneDrive de propósito: o CSV é gravado a cada simulação e a
+    # sincronização disputa o arquivo
     PASTA_SAIDA=r"C:\Users\<voce>\calibracao_noite",
     HORAS_MAXIMAS=11.0,
-    # o que conta como garimpo novo observado (fração do pixel)
     LIMIAR_NOVO=0.02,
-    # raio em torno dos autos do período para as métricas locais
     RAIO_AUTOS_M=1500.0,
-    # bloco para a correlação agregada (m)
     BLOCO_M=1000.0,
-    # combinações aleatórias depois das etapas fixas (sorteio reprodutível)
     N_ALEATORIAS=400,
     SEMENTE=2026,
-    # memória máxima para guardar campos de eventos entre simulações
     MEMORIA_CAMPOS_GB=1.5,
+    # etapa "estrutura": saturação por K mais frouxa (K × fator) e escalas de
+    # contágio menores, nos dois modos. Exige PASTA_SAIDA nova (coluna k_fator)
+    ESTRUTURA=False,
 )
 
 # faixas exploradas (edite à vontade; o padrão do plugin está em Parametros)
 # 1º calibra-se r0 para a área nova prevista bater com a observada; as etapas
 # seguintes usam esse r0 — senão, com tudo subestimado, o critério premiaria
 # a fiscalização mais fraca só por deixar crescer mais
-R0 = [0.001, 0.002, 0.003, 0.005, 0.008, 0.012, 0.018, 0.027, 0.04]
+# v1: com r0 = 0,001 (o menor testado) a área prevista ainda era 4,6× a
+# observada; a varredura agora desce até 0,0001 para cercar a razão 1
+R0 = [0.0001, 0.00015, 0.0002, 0.0003, 0.0004, 0.0005, 0.0007, 0.001, 0.002]
+# escalas de proximidade das linhas de base (m): o modelo é comparado com a
+# melhor delas, não só com a de 380 m
+ESCALAS_BASE_M = [200.0, 250.0, 300.0, 380.0, 500.0]
 SENSIBILIDADE = {
     "alerta_peso": [0.0, 0.5, 2.0, 4.0],
     "alerta_semeia": [False],
     "alerta_tau_dias": [30.0, 180.0],
-    "escala_contagio_m": [250.0, 500.0, 750.0],
+    # v1: o melhor foi o menor testado (250 m); 200 m ≈ 1,3 pixel de 150 m
+    "escala_contagio_m": [200.0, 250.0, 300.0, 500.0],
     "fisc_max": [0.0, 0.4, 1.0],
     "fisc_plato_dias": [60.0, 120.0, 270.0, 365.0, 730.0, 3650.0],
     "fisc_escala_m": [250.0, 500.0, 1000.0, 1500.0],
@@ -111,10 +127,15 @@ FISCAL = {
     "fisc_escala_m": [400.0, 750.0, 1000.0],
     "fisc_max": [0.5, 0.8, 1.0],
 }
+# etapa "estrutura" (CONFIG["ESTRUTURA"]): o fator multiplica K (limitado a 1)
+# nos pixels com K > 0; 100 equivale a não haver saturação (K = 1)
+ESTRUTURA_K = [1.0, 1.5, 2.0, 100.0]
+ESTRUTURA_ESCALAS_M = [100.0, 150.0, 200.0, 380.0]
 ALEATORIA = {
-    "r0": (0.001, 0.02, "log"),
+    # faixa em torno do r0 que reproduz a área (v1: 0,001–0,02 só superestimava)
+    "r0": (0.0001, 0.002, "log"),
     "alerta_peso": (0.0, 4.0, "lin"),
-    "escala_contagio_m": (250.0, 750.0, "lin"),
+    "escala_contagio_m": (200.0, 500.0, "lin"),
     "fisc_max": (0.0, 1.0, "lin"),
     "fisc_plato_dias": (60.0, 730.0, "log"),
     "fisc_escala_m": (250.0, 1500.0, "log"),
@@ -126,7 +147,7 @@ COLUNAS = ["id", "etapa", "modo", "r0", "alerta_peso", "alerta_escala_m",
            "auc", "captura_1", "captura_5", "captura_10", "r_blocos",
            "pred_ha", "obs_ha", "razao_area", "perto_autos_pred_ha",
            "perto_autos_obs_ha", "perto_autos_razao", "perto_autos_auc",
-           "segundos", "erro"]
+           "segundos", "erro", "k_fator"]
 PARAMETROS_CSV = COLUNAS[3:14]
 
 _CONTEXTO = {}
@@ -313,8 +334,9 @@ def verificar():
     for chave in ("K", "MU_INICIAL", "MU_FINAL"):
         if not os.path.isfile(CONFIG[chave]):
             raise ValueError("%s não encontrado: %s" % (chave, CONFIG[chave]))
-    if CONFIG["MASCARA"] and not os.path.isfile(CONFIG["MASCARA"]):
-        raise ValueError("MASCARA não encontrada: %s" % CONFIG["MASCARA"])
+    for chave in ("MASCARA", "MASCARA_AVALIACAO"):
+        if CONFIG.get(chave) and not os.path.isfile(CONFIG[chave]):
+            raise ValueError("%s não encontrada: %s" % (chave, CONFIG[chave]))
     t0, t1 = _data(CONFIG["DATA_INICIAL"]), _data(CONFIG["DATA_FINAL"])
     if t1 <= t0:
         raise ValueError("DATA_FINAL deve ser posterior a DATA_INICIAL")
@@ -358,7 +380,16 @@ def verificar():
     if CONFIG["MASCARA"]:
         mascara = _raster.ler_alinhado(CONFIG["MASCARA"], grade,
                                        "vizinho") > 0
+    # universo = onde as métricas são medidas. A simulação roda em MASCARA
+    # (APA + entorno); a avaliação fica restrita a MASCARA_AVALIACAO (APA)
     universo = mascara if mascara is not None else np.ones(K.shape, bool)
+    if CONFIG.get("MASCARA_AVALIACAO"):
+        universo = universo & (_raster.ler_alinhado(
+            CONFIG["MASCARA_AVALIACAO"], grade, "vizinho") > 0)
+    _log("domínio da simulação: %.0f km² | universo de avaliação: %.0f km²"
+         % ((mascara.sum() if mascara is not None else K.size)
+            * grade.pixel_m ** 2 / 1e6,
+            universo.sum() * grade.pixel_m ** 2 / 1e6))
     area_ha = grade.pixel_m ** 2 / 10000.0
     obs_novo = np.where(universo, np.clip(mu1 - mu0, 0.0, None), 0.0)
     _log("garimpo observado: %.0f ha em %s, %.0f ha em %s; novo: %.0f ha"
@@ -437,14 +468,25 @@ def verificar():
 
 def _linhas_de_base(ctx):
     """Alternativas simples, sem dinâmica: o modelo precisa superá-las."""
-    feitos = _ids_feitos()
-    nucleo = ctx["kernels"].kernel_contagio(380.0, ctx["grade"].pixel_m)
-    proximidade = ctx["numerico"].convolver(ctx["mu0"], nucleo)
+    for linha in calcular_linhas_de_base(ctx, _ids_feitos()):
+        _gravar_linha(linha)
+        _log("linha de base %-28s AUC %.3f  captura 5%% %.0f%%"
+             % (linha["modo"], linha["auc"], 100 * linha["captura_5"]))
+
+
+def calcular_linhas_de_base(ctx, feitos=()):
+    """Linhas do CSV das linhas de base ainda não feitas (não grava nada)."""
+    linhas = []
     folga = np.clip(ctx["K"] - ctx["mu0"], 0.0, None)
-    for nome, pontuacao in (("so_K", ctx["K"]),
-                            ("remanescente", folga),
-                            ("proximidade", proximidade),
-                            ("proximidade_x_remanescente", proximidade * folga)):
+    candidatos = [("so_K", ctx["K"]), ("remanescente", folga)]
+    # proximidade em várias escalas: a comparação justa é com a melhor delas
+    for escala in ESCALAS_BASE_M:
+        nucleo = ctx["kernels"].kernel_contagio(escala, ctx["grade"].pixel_m)
+        proximidade = ctx["numerico"].convolver(ctx["mu0"], nucleo)
+        candidatos.append(("proximidade_%dm" % escala, proximidade))
+        candidatos.append(("proximidade_x_remanescente_%dm" % escala,
+                           proximidade * folga))
+    for nome, pontuacao in candidatos:
         identificador = "base_" + nome
         if identificador in feitos:
             continue
@@ -452,9 +494,8 @@ def _linhas_de_base(ctx):
         linha.update(id=identificador, etapa="linha_de_base", modo=nome)
         linha.update(avaliar(pontuacao, ctx, magnitude=False))
         linha["segundos"] = 0.0
-        _gravar_linha(linha)
-        _log("linha de base %-28s AUC %.3f  captura 5%% %.0f%%"
-             % (nome, linha["auc"], 100 * linha["captura_5"]))
+        linhas.append(linha)
+    return linhas
 
 
 # =========================================================================
@@ -522,6 +563,14 @@ def _plano_restante(padrao, r0):
             for fmax in FISCAL["fisc_max"]:
                 item("fiscal", "reconstrucao", fisc_plato_dias=plato,
                      fisc_escala_m=alcance, fisc_max=fmax)
+    if CONFIG.get("ESTRUTURA"):
+        for fator in ESTRUTURA_K:
+            for escala in ESTRUTURA_ESCALAS_M:
+                for modo in ("reconstrucao", "previsao"):
+                    mudancas = {"escala_contagio_m": escala}
+                    if fator != 1.0:          # fator 1 = mesmo id de antes
+                        mudancas["k_fator"] = fator
+                    item("estrutura", modo, **mudancas)
     sorteio = random.Random(CONFIG["SEMENTE"])
     for i in range(int(CONFIG["N_ALEATORIAS"])):
         mudancas = {}
@@ -600,11 +649,17 @@ def _rodar_uma(ctx, item):
     linha.update(item["params"])
     inicio = time.time()
     try:
-        params = ctx["model"].Parametros(**item["params"]).validar()
+        valores = dict(item["params"])
+        fator = float(valores.pop("k_fator", 1.0))
+        params = ctx["model"].Parametros(**valores).validar()
+        K = ctx["K"]
+        if fator != 1.0:
+            K = np.where(K > 0, np.minimum(K * fator, 1.0),
+                         0.0).astype(np.float32)
         alertas = _campo(ctx, "alertas", item["modo"], params.alerta_escala_m)
         autos = _campo(ctx, "autos", item["modo"], params.fisc_escala_m)
         resultado = ctx["model"].simular(
-            ctx["K"], ctx["mu0"], ctx["grade"].pixel_m, ctx["t0"], ctx["t1"],
+            K, ctx["mu0"], ctx["grade"].pixel_m, ctx["t0"], ctx["t1"],
             params, campo_alertas=alertas, campo_fiscalizacao=autos,
             mascara=ctx["mascara"])
         linha.update(avaliar(resultado.delta_mu, ctx))
@@ -639,15 +694,28 @@ def _formatar(valor):
     return str(valor)
 
 
+def _cabecalho(caminho):
+    with open(caminho, encoding="utf-8", newline="") as arquivo:
+        return next(csv.reader(arquivo, delimiter=";"), [])
+
+
 def _gravar_linha(linha):
     caminho = _caminho_csv()
     novo = not os.path.isfile(caminho)
+    # um CSV de versão anterior, sem a coluna k_fator, continua válido para
+    # o plano antigo; só a etapa estrutura precisa de pasta nova
+    colunas = COLUNAS if novo else _cabecalho(caminho)
+    fator = linha.get("k_fator", "")
+    if "k_fator" not in colunas and fator not in ("", 1, 1.0):
+        raise ValueError("o resultados.csv desta PASTA_SAIDA é de uma versão "
+                         "sem a coluna k_fator; para a etapa estrutura, use "
+                         "uma PASTA_SAIDA nova")
     with open(caminho, "a", encoding="utf-8", newline="") as arquivo:
-        escritor = csv.DictWriter(arquivo, fieldnames=COLUNAS, delimiter=";",
+        escritor = csv.DictWriter(arquivo, fieldnames=colunas, delimiter=";",
                                   extrasaction="ignore")
         if novo:
             escritor.writeheader()
-        escritor.writerow({c: _formatar(linha.get(c, "")) for c in COLUNAS})
+        escritor.writerow({c: _formatar(linha.get(c, "")) for c in colunas})
         arquivo.flush()
         os.fsync(arquivo.fileno())
 
@@ -723,8 +791,9 @@ def _resumir_seguro():
 # =========================================================================
 # resumo
 # =========================================================================
-def _ler_csv():
-    with open(_caminho_csv(), encoding="utf-8", newline="") as arquivo:
+def _ler_csv(caminho=None):
+    with open(caminho or _caminho_csv(), encoding="utf-8",
+              newline="") as arquivo:
         linhas = list(csv.DictReader(arquivo, delimiter=";"))
     for linha in linhas:
         for chave, valor in linha.items():
@@ -732,8 +801,11 @@ def _ler_csv():
                 continue
             try:
                 linha[chave] = float(valor) if valor != "" else float("nan")
-            except ValueError:
+            except (TypeError, ValueError):
                 pass
+        if not isinstance(linha.get("k_fator"), float) or \
+                math.isnan(linha["k_fator"]):
+            linha["k_fator"] = 1.0
     return linhas
 
 
@@ -846,6 +918,22 @@ def resumir(imprimir=True):
                             _mediana([l["captura_5"] for l in grupo]),
                             _mediana([l.get("perto_autos_auc", float("nan"))
                                       for l in grupo])))
+    estrutura = [l for l in sims if l["etapa"] == "estrutura"
+                 or _so_muda_a_escala(l, sims)]
+    if any(l["etapa"] == "estrutura" for l in estrutura):
+        escrever("")
+        escrever("6) ESTRUTURA — saturação por K × fator (100 = sem saturação) "
+                 "e escala de contágio; compare com a melhor linha de base "
+                 "(AUC %.3f, cap5 %.3f)"
+                 % (max([b["auc"] for b in bases] or [float("nan")]),
+                    max([b["captura_5"] for b in bases] or [float("nan")])))
+        escrever("  %-12s %7s %7s %7s %7s %7s" % ("modo", "k_fator", "escala",
+                                                   "AUC", "cap5", "área"))
+        for l in sorted(estrutura, key=lambda l: (l["modo"], l["k_fator"],
+                                                  l["escala_contagio_m"])):
+            escrever("  %-12s %7.4g %7.0f %7.3f %7.3f %7s"
+                     % (l["modo"], l["k_fator"], l["escala_contagio_m"],
+                        l["auc"], l["captura_5"], _f(l.get("razao_area"))))
     escrever("")
     escrever("Leitura: compare primeiro (1). Em (5), diferenças de AUC "
              "menores que ~0,005 entre valores não distinguem nada; as colunas "
@@ -865,6 +953,137 @@ def resumir(imprimir=True):
     return texto
 
 
+def _so_muda_a_escala(linha, sims):
+    """Linha com K × 1 que difere da calibrada só na escala de contágio.
+
+    Essas combinações já existem nas etapas calibrado e sensibilidade, com o
+    mesmo id; entram na tabela da estrutura como referência de K × 1.
+    """
+    if linha["etapa"] not in ("calibrado", "sensibilidade") or \
+            linha["k_fator"] != 1.0:
+        return False
+    referencia = [l for l in sims if l["etapa"] == "calibrado"
+                  and l["modo"] == linha["modo"]]
+    if not referencia:
+        return False
+    return all(linha[c] == referencia[0][c] or
+               (c == "escala_contagio_m")
+               for c in PARAMETROS_CSV if c != "alerta_semeia") and \
+        linha["alerta_semeia"] == referencia[0]["alerta_semeia"]
+
+
+# =========================================================================
+# teste fora da amostra (lê dois resultados.csv; não simula nada)
+# =========================================================================
+def _postos(valores):
+    valores = np.asarray(valores, dtype=np.float64)
+    _, inverso, contagens = np.unique(valores, return_inverse=True,
+                                      return_counts=True)
+    fim = np.cumsum(contagens).astype(np.float64)
+    return (fim - (contagens - 1) / 2.0)[inverso.ravel()]
+
+
+def _spearman(a, b):
+    if len(a) < 3:
+        return float("nan")
+    pa, pb = _postos(a), _postos(b)
+    if pa.std() == 0 or pb.std() == 0:
+        return float("nan")
+    return float(np.corrcoef(pa, pb)[0, 1])
+
+
+def fora_da_amostra(pasta_treino, pasta_teste, n=10, imprimir=True):
+    """Escolhe parâmetros num período e mede no outro, sem simular nada.
+
+    Rode o mesmo plano (mesmo SEMENTE, N_ALEATORIAS e faixas) em dois
+    períodos, cada um na sua PASTA_SAIDA — por exemplo 2020→2022 (treino) e
+    2022→2024 (teste). As combinações aleatórias têm o mesmo id nos dois.
+    Aqui as ``n`` melhores no treino, por AUC, são lidas no teste; a linha de
+    base de comparação também é escolhida no treino. É a medida honesta: o
+    teste não participa de nenhuma escolha.
+    """
+    treino = [l for l in _ler_csv(os.path.join(pasta_treino, "resultados.csv"))
+              if not l.get("erro")]
+    teste = [l for l in _ler_csv(os.path.join(pasta_teste, "resultados.csv"))
+             if not l.get("erro")]
+    por_id = {l["id"]: l for l in teste}
+    saida = []
+    escrever = saida.append
+    escrever("TESTE FORA DA AMOSTRA — %s" % _dt.datetime.now().strftime(
+        "%d/%m/%Y %H:%M"))
+    escrever("treino: %s" % pasta_treino)
+    escrever("teste:  %s" % pasta_teste)
+
+    bases_treino = [l for l in treino if l["etapa"] == "linha_de_base"]
+    base_escolhida = None
+    if bases_treino:
+        melhor = max(bases_treino, key=lambda l: l["auc"])
+        base_escolhida = por_id.get(melhor["id"])
+        escrever("")
+        escrever("Linha de base escolhida no treino: %s (AUC treino %.3f)"
+                 % (melhor["modo"], melhor["auc"]))
+        if base_escolhida:
+            escrever("   no teste: AUC %.3f  cap5 %.3f"
+                     % (base_escolhida["auc"], base_escolhida["captura_5"]))
+
+    for modo in ("previsao", "reconstrucao"):
+        comuns = [(l, por_id[l["id"]]) for l in treino
+                  if l["etapa"] == "aleatoria" and l["modo"] == modo
+                  and l["id"] in por_id]
+        escrever("")
+        escrever("MODO %s — %d combinações aleatórias nos dois períodos"
+                 % (modo.upper(), len(comuns)))
+        if not comuns:
+            escrever("   nenhuma em comum: os planos dos dois períodos são "
+                     "iguais? (SEMENTE, N_ALEATORIAS e ALEATORIA)")
+            continue
+        escrever("   estabilidade (Spearman treino × teste): AUC %.2f  "
+                 "cap5 %.2f"
+                 % (_spearman([a["auc"] for a, _ in comuns],
+                              [b["auc"] for _, b in comuns]),
+                    _spearman([a["captura_5"] for a, _ in comuns],
+                              [b["captura_5"] for _, b in comuns])))
+        escolhidas = sorted(comuns, key=lambda par: -par[0]["auc"])[:n]
+        melhor_teste = max(b["auc"] for _, b in comuns)
+        escrever("   as %d melhores no treino, medidas no teste "
+                 "(melhor possível no teste: AUC %.3f):" % (len(escolhidas),
+                                                             melhor_teste))
+        escrever("   %7s %7s %7s %7s %7s  %s" % ("AUC_tr", "AUC_te", "cap5_te",
+                                                 "área_te", "r_bl_te",
+                                                 "parâmetros"))
+        for a, b in escolhidas:
+            escrever("   %7.3f %7.3f %7.3f %7s %7.3f  r0=%.4g α=%.2g "
+                     "Fmax=%.2g platô=%.0f d0=%.0f esc=%.0f"
+                     % (a["auc"], b["auc"], b["captura_5"],
+                        _f(b.get("razao_area")), b["r_blocos"], b["r0"],
+                        b["alerta_peso"], b["fisc_max"], b["fisc_plato_dias"],
+                        b["fisc_escala_m"], b["escala_contagio_m"]))
+        mediana_auc = _mediana([b["auc"] for _, b in escolhidas])
+        mediana_cap = _mediana([b["captura_5"] for _, b in escolhidas])
+        escrever("   mediana no teste: AUC %.3f  cap5 %.3f"
+                 % (mediana_auc, mediana_cap))
+        if base_escolhida:
+            escrever("   %s a linha de base escolhida no treino "
+                     "(AUC %+.3f, cap5 %+.3f)"
+                     % ("SUPERA" if mediana_auc > base_escolhida["auc"]
+                        and mediana_cap > base_escolhida["captura_5"]
+                        else "NÃO supera",
+                        mediana_auc - base_escolhida["auc"],
+                        mediana_cap - base_escolhida["captura_5"]))
+    escrever("")
+    escrever("Leitura: o modo previsão é o que vale como antecipação. "
+             "Estabilidade baixa (< 0,5) indica que o ranking de parâmetros "
+             "de um período não se repete no outro: os 'melhores' "
+             "parâmetros refletem só aquele período.")
+    texto = "\n".join(saida)
+    with open(os.path.join(pasta_teste, "fora_da_amostra.txt"), "w",
+              encoding="utf-8") as arquivo:
+        arquivo.write(texto + "\n")
+    if imprimir:
+        print(texto)
+    return texto
+
+
 def _f(valor):
     if valor is None or (isinstance(valor, float) and math.isnan(valor)):
         return "—"
@@ -876,3 +1095,4 @@ if __name__ != "__main__" or "qgis" in sys.modules:
     print("   verificar()      # confere os dados e estima o tempo")
     print("   rodar_noite()    # roda a noite toda")
     print("   resumir()        # refaz o resumo a partir do CSV")
+    print("   fora_da_amostra(r'pasta_treino', r'pasta_teste')")

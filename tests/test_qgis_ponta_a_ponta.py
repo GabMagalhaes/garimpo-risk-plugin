@@ -82,7 +82,7 @@ def test_calibracao_da_noite_roda_retoma_e_resume(qgis, tmp_path,
     espaco["CONFIG"].update(
         K=dados["K"], MU_INICIAL=dados["mu0"],
         # o próprio K como "garimpo observado no fim": há garimpo novo
-        MU_FINAL=dados["K"], MASCARA=dados["mascara"],
+        MU_FINAL=dados["K"], MASCARA=dados["mascara"], MASCARA_AVALIACAO=None,
         ALERTAS=dados["eventos"] + "|layername=alertas",
         CAMPO_DATA_ALERTAS="data",
         AUTOS=dados["eventos"] + "|layername=autos", CAMPO_DATA_AUTOS="data",
@@ -99,3 +99,44 @@ def test_calibracao_da_noite_roda_retoma_e_resume(qgis, tmp_path,
     resumo = open(os.path.join(pasta, "resumo.txt"), encoding="utf-8").read()
     assert "LINHAS DE BASE" in resumo and "PLATÔ" in resumo
     assert "erro" not in primeira.split("\n", 1)[1].lower()
+
+
+def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
+    """tools/calibrar_paralelo.py com 2 processos, como no OSGeo4W Shell."""
+    import shutil
+    import subprocess
+
+    espaco = {"__name__": "__console__"}
+    caminho = os.path.join(RAIZ, "tools", "gerar_dados_teste.py")
+    exec(compile(open(caminho, encoding="utf-8").read(), caminho, "exec"),
+         espaco)
+    dados = espaco["gerar"](str(tmp_path))
+    pasta = tmp_path / "roteiros"
+    pasta.mkdir()
+    for arquivo in ("calibrar_noite.py", "calibrar_paralelo.py"):
+        shutil.copy(os.path.join(RAIZ, "tools", arquivo), str(pasta))
+    saida = str(tmp_path / "saida")
+    with open(str(pasta / "calibrar_noite.py"), "a", encoding="utf-8") as f:
+        f.write("\nCONFIG.update(K=%r, MU_INICIAL=%r, MU_FINAL=%r, MASCARA=%r,"
+                " MASCARA_AVALIACAO=None, ALERTAS=%r, CAMPO_DATA_ALERTAS='data',"
+                " AUTOS=%r, CAMPO_DATA_AUTOS='data', DATA_INICIAL='2025-01-01',"
+                " DATA_FINAL='2026-12-31', RESOLUCAO_M=200.0, PASTA_SAIDA=%r,"
+                " N_ALEATORIAS=3, ESTRUTURA=True, HORAS_MAXIMAS=1.0)\n"
+                % (dados["K"], dados["mu0"], dados["K"], dados["mascara"],
+                   dados["eventos"] + "|layername=alertas",
+                   dados["eventos"] + "|layername=autos", saida))
+    ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
+    processo = subprocess.run(
+        [sys.executable, str(pasta / "calibrar_paralelo.py"), "2"],
+        env=ambiente, capture_output=True, text=True, timeout=600)
+    assert processo.returncode == 0, processo.stdout + processo.stderr
+
+    import csv
+    with open(os.path.join(saida, "resultados.csv"), encoding="utf-8") as f:
+        linhas = list(csv.DictReader(f, delimiter=";"))
+    etapas = {l["etapa"] for l in linhas}
+    assert {"linha_de_base", "padrao", "r0", "calibrado", "fiscal",
+            "estrutura", "aleatoria"} <= etapas
+    assert not [l for l in linhas if l["erro"]]
+    assert any(l["k_fator"] == "100" for l in linhas)
+    assert os.path.isfile(os.path.join(saida, "resumo.txt"))
