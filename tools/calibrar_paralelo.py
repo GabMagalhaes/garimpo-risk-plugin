@@ -135,10 +135,17 @@ def _iniciar_trabalhador(semaforo=None):
 
 
 def _linhas_de_base(feitos):
-    """As linhas de base que faltam (calculadas num trabalhador)."""
+    """Resumo dos dados e linhas de base que faltam (num trabalhador)."""
     if _NS is None:
         raise RuntimeError("PREPARO: " + _ERRO_PREPARO)
-    return _NS["calcular_linhas_de_base"](_NS["_CONTEXTO"], feitos)
+    ctx = _NS["_CONTEXTO"]
+    universo, area_ha = ctx["universo"], ctx["area_ha"]
+    resumo = ("garimpo no universo de avaliação: %.0f ha em %s; novo até %s: "
+              "%.0f ha (%.0f km² avaliados)"
+              % (ctx["mu0"][universo].sum() * area_ha, ctx["t0"], ctx["t1"],
+                 ctx["obs_novo"].sum() * area_ha,
+                 universo.sum() * area_ha / 100.0))
+    return resumo, _NS["calcular_linhas_de_base"](ctx, feitos)
 
 
 def _trabalhar(item):
@@ -245,7 +252,7 @@ def principal(n):
                                  initargs=(semaforo,)) as pool:
             feitos = ns["_ids_feitos"]()
             try:
-                bases = pool.submit(_linhas_de_base, feitos).result()
+                resumo, bases = pool.submit(_linhas_de_base, feitos).result()
             except BrokenProcessPool:
                 log("Um processo morreu (quase sempre falta de memória). Rode "
                     "de novo com menos processos.")
@@ -254,6 +261,7 @@ def principal(n):
                 log("Falha ao preparar os dados num processo:\n%s" % erro)
                 log("PARADO: %s" % str(erro).strip().splitlines()[-1])
                 raise _Parado()
+            log(resumo)
             for linha in bases:
                 ns["_gravar_linha"](linha)
                 log("linha de base %-28s AUC %.3f  captura 5%% %.0f%%"
