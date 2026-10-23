@@ -35,12 +35,16 @@ jobs:
     # (tests/test_qgis_ponta_a_ponta.py), que os dublês não substituem.
     runs-on: ubuntu-24.04
     name: QGIS 3.34 do Ubuntu (ponta a ponta)
+    # o apt do runner às vezes fica lento por dezenas de minutos; sem limite,
+    # um job travado segura o PR por até 6 h
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Instalar QGIS
+        timeout-minutes: 30
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
             python3-qgis python3-gdal python3-pytest qgis-providers
       - name: Rodar testes
         env:
