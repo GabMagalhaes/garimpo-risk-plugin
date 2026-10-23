@@ -199,7 +199,8 @@ def _fase(ns, pool, n, plano, limite, parar):
             if str(linha.get("erro", "")).startswith("PREPARO"):
                 log("Falha ao preparar os dados num processo:\n"
                     + linha["erro"])
-                raise RuntimeError("preparação falhou; veja calibracao.log")
+                log("PARADO: %s" % linha["erro"].strip().splitlines()[-1])
+                raise _Parado()
             ns["_gravar_linha"](linha)
             feitas += 1
             if linha.get("erro"):
@@ -251,7 +252,8 @@ def principal(n):
                 raise
             except RuntimeError as erro:
                 log("Falha ao preparar os dados num processo:\n%s" % erro)
-                raise
+                log("PARADO: %s" % str(erro).strip().splitlines()[-1])
+                raise _Parado()
             for linha in bases:
                 ns["_gravar_linha"](linha)
                 log("linha de base %-28s AUC %.3f  captura 5%% %.0f%%"
@@ -273,5 +275,12 @@ def principal(n):
         log("=== fim: %d simulações nesta sessão. Veja resumo.txt ===" % total)
 
 
+class _Parado(Exception):
+    """Erro já explicado no log: sai sem repetir o traceback."""
+
+
 if __name__ == "__main__":
-    principal(int(sys.argv[1]) if len(sys.argv) > 1 else 12)
+    try:
+        principal(int(sys.argv[1]) if len(sys.argv) > 1 else 12)
+    except _Parado:
+        sys.exit(1)
