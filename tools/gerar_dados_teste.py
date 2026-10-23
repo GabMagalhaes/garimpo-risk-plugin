@@ -253,7 +253,8 @@ def testar_ponta_a_ponta(pasta=None, prefixo="teste"):
     for nome in [m for m in sys.modules if m.split(".")[0] == "risco_garimpo"]:
         del sys.modules[nome]
     try:
-        from risco_garimpo.core import execucao, execucao_estatica, registro
+        from risco_garimpo.core import (execucao, execucao_estatica,
+                                        execucao_validacao, registro)
     except ImportError as erro:
         print("ERRO: não achei o plugin Risco Garimpo com o registro de "
               "execução (%s). Instale o ZIP novo em Complementos → "
@@ -308,15 +309,23 @@ def testar_ponta_a_ponta(pasta=None, prefixo="teste"):
         execucao_estatica.preparar(cfg_e, registrar=log), registrar=log)
     execucao_estatica.escrever(calculado, registrar=log)
 
+    print("\n=== Validação (a execução dinâmica contra o próprio μ final) ===")
+    cfg_v = execucao_validacao.de_registro(
+        saida["registro"], saida["saidas"]["mu_final"],
+        camada_subbacias=subbacias, campo_id_subbacia="nome")
+    execucao_validacao.validar(cfg_v, registrar=log)
+
     registros = {
         "dinamico": saida["registro"],
         "estatico": execucao_estatica.caminho_de_saida(cfg_e, "registro",
                                                        "json"),
+        "validacao": execucao_validacao.caminho_de_saida(cfg_v, "registro",
+                                                         "json"),
     }
     falhas = 0
     for rotulo, caminho in registros.items():
         falhas += _conferir_registro(rotulo, caminho, json)
-    print("\n%s" % ("TUDO CERTO: os dois registros têm o esperado."
+    print("\n%s" % ("TUDO CERTO: os três registros têm o esperado."
                      if not falhas else
                      "%d verificação(ões) falharam — veja acima." % falhas))
     registros["falhas"] = falhas
@@ -346,7 +355,22 @@ def _conferir_registro(rotulo, caminho, json):
     print("   saídas:       %s" % ", ".join(sorted(dados["saidas"])))
 
     insumos = {i["papel"]: i for i in dados["insumos"]}
-    if rotulo == "dinamico":
+    if rotulo == "validacao":
+        modelo = dados["resultados"]["metricas"][0]
+        esperado = [
+            ("expansão, μ₀, μ final e K identificados por SHA-256",
+             all(insumos.get(p, {}).get("sha256")
+                 for p in ("previsto", "mu_inicial", "mu_final", "K"))),
+            ("contra o próprio μ final: área prevista / observada = 1",
+             abs(modelo["razao_area"] - 1.0) < 1e-3),
+            ("contra o próprio μ final: AUC ≥ 0,99", modelo["auc"] >= 0.99),
+            ("tabela, curva de captura e sub-bacias gravadas",
+             {"metricas", "curva_captura", "subbacias"}
+             <= set(dados["saidas"])),
+            ("aviso de reconstrução (alertas depois da data inicial)",
+             bool(dados["resultados"]["avisos"])),
+        ]
+    elif rotulo == "dinamico":
         esperado = [
             ("K, μ₀ e máscara identificados por SHA-256",
              all(insumos.get(p, {}).get("sha256")

@@ -318,7 +318,7 @@ O registro descreve os arquivos listados em `saidas`. Antes da primeira saída, 
 - **Janelas de eventos:** eventos agrupados na mesma janela compartilham uma data de referência. Escolha uma janela compatível com a duração dos efeitos; o projeto exemplifica 30 dias para um platô de 180 dias [P1].
 - **Intensidade dos efeitos:** ajuste `r₀`, `α` e `F_max` com dados observados. A forma das funções temporais e espaciais constitui uma parte da parametrização.
 - **Memória:** muitas janelas em rasters extensos aumentam a demanda. Avalie a resolução e o número de janelas em conjunto com as escalas dos processos.
-- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. As métricas estão em `core/validacao.py`, descritas abaixo; a ferramenta de validação na interface ainda não existe.
+- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. As métricas estão em `core/validacao.py` e a validação de uma execução em `core/execucao_validacao.py`, descritas abaixo; a ferramenta na interface ainda não existe.
 - **Calibração em lote:** `tools/calibrar_noite.py` roda, no Console Python do QGIS, centenas de simulações entre duas datas com mapas de garimpo e compara a expansão prevista com a observada. Primeiro calibra `r₀` para a área nova prevista igualar a observada; depois varia os demais parâmetros, com um fatorial de platô, alcance e `F_max` da fiscalização, e compara o modelo com alternativas sem dinâmica (só `K`, remanescente, proximidade ao garimpo existente). Grava cada simulação num CSV assim que termina, retoma de onde parou e escreve `resumo.txt`. `tools/calibrar_paralelo.py` roda o mesmo plano em vários processos, fora do QGIS. `fora_da_amostra(treino, teste)` compara dois períodos rodados com o mesmo plano: escolhe os parâmetros num período e mede o desempenho no outro, sem simular de novo. As instruções estão no início de cada arquivo.
 
 A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_permanentemente`. Ele examina, em um cenário sintético, a persistência de diferenças de trajetória após a fiscalização perder intensidade. A duração e a magnitude dessas diferenças dependem dos parâmetros, da saturação e do horizonte analisado. A interpretação territorial exige comparação com dados observados.
@@ -337,6 +337,25 @@ A rotina `core/validacao.py` compara a expansão prevista `Δμ` com o garimpo n
 | `spearman` e `topo_comum` por sub-bacia | A priorização das sub-bacias acerta? | Correlação de postos entre as áreas previstas e observadas por sub-bacia, e fração das 10% sub-bacias de maior expansão observada que também estão entre as de maior expansão prevista. | Definição deste documento. |
 
 Empates, inevitáveis porque o risco é zero em boa parte da área, são tratados por posto médio na AUC e por rateio proporcional na captura; assim, nenhuma métrica depende da ordem dos pixels no raster. O universo da avaliação é a área de estudo inteira, inclusive onde `K = 0`: garimpo novo fora de `K` é erro do modelo e deve contar.
+
+**Validar uma execução.** `core/execucao_validacao.py` parte do registro de uma execução do modelo dinâmico e só pede o garimpo observado na data final. No Console Python do QGIS:
+
+```python
+from risco_garimpo.core import execucao_validacao as v
+config = v.de_registro(r"C:\saida\PMT_registro_20241231.json",
+                       r"C:\dados\garimpo_2024.tif",
+                       caminho_mascara_avaliacao=r"C:\dados\mascara_area.tif")
+v.validar(config)
+```
+
+Do registro saem a expansão prevista, `μ₀`, `K`, a máscara e as datas. O SHA-256 de cada insumo é conferido de novo, e a validação avisa se algum arquivo mudou desde a execução. Ela avisa também quando a execução usou alertas ou autos posteriores à data inicial: nesse caso, mede a reconstrução do período, e não a antecipação. As saídas, com o prefixo da execução seguido de `_validacao`, são:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `_metricas.csv` | Uma linha para o modelo e uma para cada linha de base, com todas as métricas da tabela acima. |
+| `_curva_captura.csv` e `_curva_captura.png` | Curva de captura do modelo e das linhas de base; a figura traz o modelo, a melhor linha de base e o acaso. A figura exige matplotlib, que acompanha o QGIS. |
+| `_subbacias.gpkg` | Com uma camada de sub-bacias: `va_prev_ha` e `va_obs_ha`, as áreas novas prevista e observada, e `va_rank_prev` e `va_rank_obs`, as posições nas duas ordenações. |
+| `_registro.json` | Registro da validação, com as métricas, os avisos e o SHA-256 dos insumos. |
 
 Para que a comparação tenha sentido, o modelo precisa superar alternativas sem dinâmica, calculadas por `linhas_de_base`: só `K`, o remanescente `K − μ`, a proximidade ao garimpo existente e a proximidade onde ainda há remanescente. A capacidade de antecipação só é medida honestamente com eventos até a data inicial; com os eventos do período inteiro, a avaliação mede a reconstrução do que aconteceu.
 
@@ -358,6 +377,7 @@ Para que a comparação tenha sentido, o modelo precisa superar alternativas sem
 | `core/execucao_estatica.py` | Orquestração do modelo estático. |
 | `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
 | `core/validacao.py` | Métricas de validação da expansão prevista contra o garimpo novo observado. |
+| `core/execucao_validacao.py` | Orquestração da validação de uma execução: leitura alinhada, métricas, linhas de base, curva de captura, sub-bacias e registro. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
 | `tools/` | Geração de interfaces, empacotamento e dados de teste. |
 | `tests/` | Testes do núcleo e contratos de interface. |

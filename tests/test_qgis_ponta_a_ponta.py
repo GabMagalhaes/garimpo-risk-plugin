@@ -56,9 +56,16 @@ def test_roteiro_do_console_roda_os_dois_modelos(qgis, tmp_path, monkeypatch):
         estatico = json.load(arquivo)
     assert os.path.isfile(estatico["saidas"]["subbacias"])
 
-    # o GeoPackage do estático tem os campos pa_*, e o do dinâmico, rg_*
+    with open(resultado["validacao"], encoding="utf-8") as arquivo:
+        validacao = json.load(arquivo)
+    assert validacao["resultados"]["subbacias"]["spearman"] == \
+        pytest.approx(1.0)                 # a execução contra ela mesma
+
+    # cada GeoPackage com os seus campos: pa_* (estático), rg_* (dinâmico),
+    # va_* (validação)
     for chave, prefixo, nome in ((estatico, "pa_", "potencial_subbacias"),
-                                 (dinamico, "rg_", "risco_subbacias")):
+                                 (dinamico, "rg_", "risco_subbacias"),
+                                 (validacao, "va_", "validacao_subbacias")):
         camada = qgis_core.QgsVectorLayer(
             "%s|layername=%s" % (chave["saidas"]["subbacias"], nome), nome,
             "ogr")
