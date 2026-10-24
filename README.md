@@ -1,13 +1,14 @@
 # Risco Garimpo — plugin QGIS
 
-Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza duas ferramentas no menu **Raster → Risco Garimpo**:
+Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza três ferramentas no menu **Raster → Risco Garimpo**:
 
 | Ferramenta | Função | Produto principal |
 |---|---|---|
 | **Modelo estático — gerar K** | Estimar a capacidade de ocupação por garimpo a partir das condições do terreno e de uma calibração com dados observados. | Raster `K.tif`, com a fração máxima estimada de ocupação de cada pixel. |
 | **Modelo dinâmico de risco** | Simular a expansão no período escolhido, considerando ocupação inicial, contágio, alertas e fiscalização. | Raster de expansão `Δμ`, correspondente ao acréscimo de ocupação simulado. |
+| **Validar uma execução** | Comparar a expansão prevista por uma execução do modelo dinâmico com o garimpo novo observado, e com alternativas sem dinâmica. | Tabela de métricas, curva de captura e comparação por sub-bacia. |
 
-O modelo estático grava a capacidade estimada em arquivo. O modelo dinâmico recebe esse raster como insumo e o mantém fixo durante a simulação. Também pode receber um raster de capacidade produzido por outro procedimento, desde que compatível com a ocupação inicial.
+O modelo estático grava a capacidade estimada em arquivo. O modelo dinâmico recebe esse raster como insumo e o mantém fixo durante a simulação. Também pode receber um raster de capacidade produzido por outro procedimento, desde que compatível com a ocupação inicial. A validação lê o registro e as saídas de uma execução do modelo dinâmico.
 
 As equações abaixo descrevem a formulação documentada pelo projeto [P1]. As legendas informam o significado, a unidade e a origem dos símbolos. As referências dos métodos estão reunidas ao final.
 
@@ -318,7 +319,7 @@ O registro descreve os arquivos listados em `saidas`. Antes da primeira saída, 
 - **Janelas de eventos:** eventos agrupados na mesma janela compartilham uma data de referência. Escolha uma janela compatível com a duração dos efeitos; o projeto exemplifica 30 dias para um platô de 180 dias [P1].
 - **Intensidade dos efeitos:** ajuste `r₀`, `α` e `F_max` com dados observados. A forma das funções temporais e espaciais constitui uma parte da parametrização.
 - **Memória:** muitas janelas em rasters extensos aumentam a demanda. Avalie a resolução e o número de janelas em conjunto com as escalas dos processos.
-- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. As métricas estão em `core/validacao.py` e a validação de uma execução em `core/execucao_validacao.py`, descritas abaixo; a ferramenta na interface ainda não existe.
+- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. A ferramenta **Validar uma execução** faz essa comparação; as métricas e o procedimento estão descritos abaixo.
 - **Calibração em lote:** `tools/calibrar_noite.py` roda, no Console Python do QGIS, centenas de simulações entre duas datas com mapas de garimpo e compara a expansão prevista com a observada. Primeiro calibra `r₀` para a área nova prevista igualar a observada; depois varia os demais parâmetros, com um fatorial de platô, alcance e `F_max` da fiscalização, e compara o modelo com alternativas sem dinâmica (só `K`, remanescente, proximidade ao garimpo existente). Grava cada simulação num CSV assim que termina, retoma de onde parou e escreve `resumo.txt`. `tools/calibrar_paralelo.py` roda o mesmo plano em vários processos, fora do QGIS. `fora_da_amostra(treino, teste)` compara dois períodos rodados com o mesmo plano: escolhe os parâmetros num período e mede o desempenho no outro, sem simular de novo. As instruções estão no início de cada arquivo.
 
 A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_permanentemente`. Ele examina, em um cenário sintético, a persistência de diferenças de trajetória após a fiscalização perder intensidade. A duração e a magnitude dessas diferenças dependem dos parâmetros, da saturação e do horizonte analisado. A interpretação territorial exige comparação com dados observados.
@@ -338,7 +339,7 @@ A rotina `core/validacao.py` compara a expansão prevista `Δμ` com o garimpo n
 
 Empates, inevitáveis porque o risco é zero em boa parte da área, são tratados por posto médio na AUC e por rateio proporcional na captura; assim, nenhuma métrica depende da ordem dos pixels no raster. O universo da avaliação é a área de estudo inteira, inclusive onde `K = 0`: garimpo novo fora de `K` é erro do modelo e deve contar.
 
-**Validar uma execução.** `core/execucao_validacao.py` parte do registro de uma execução do modelo dinâmico e só pede o garimpo observado na data final. No Console Python do QGIS:
+**Validar uma execução.** Em **Raster → Risco Garimpo → Validar uma execução…**, escolha o registro da execução (o `<prefixo>_registro_<data>.json` gravado pelo modelo dinâmico) e o garimpo observado na data final; os demais campos são preenchidos pelo registro. A mesma rotina, `core/execucao_validacao.py`, pode ser chamada no Console Python do QGIS:
 
 ```python
 from risco_garimpo.core import execucao_validacao as v

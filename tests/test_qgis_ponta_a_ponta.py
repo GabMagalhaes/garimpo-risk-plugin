@@ -147,3 +147,17 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
     assert not [l for l in linhas if l["erro"]]
     assert any(l["k_fator"] == "100" for l in linhas)
     assert os.path.isfile(os.path.join(saida, "resumo.txt"))
+
+
+def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
+    """O diálogo de verdade, com Qt e QgsTask, em processo próprio."""
+    import subprocess
+
+    ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
+    processo = subprocess.run(
+        [sys.executable, os.path.join(RAIZ, "tests",
+                                      "roteiro_dialogo_validacao.py"),
+         str(tmp_path)],
+        env=ambiente, capture_output=True, text=True, timeout=600)
+    saida = processo.stdout + processo.stderr
+    assert processo.returncode == 0 and "DIALOGO_OK" in processo.stdout, saida

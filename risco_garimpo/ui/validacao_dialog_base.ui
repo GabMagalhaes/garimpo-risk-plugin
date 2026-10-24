@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ValidacaoDialogBase</class>
+<widget class="QDialog" name="ValidacaoDialogBase">
+<property name="geometry"><rect><x>0</x><y>0</y><width>820</width><height>680</height></rect></property>
+<property name="windowTitle"><string>Risco Garimpo — Validar uma execução</string></property>
+<layout class="QVBoxLayout" name="layoutPrincipal">
+<item>
+<widget class="QTabWidget" name="abas">
+<property name="currentIndex"><number>0</number></property>
+<widget class="QWidget" name="abaInsumos">
+<attribute name="title"><string>Execução e observado</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaInsumos">
+<item>
+<widget class="QGroupBox" name="grupoExecucao">
+<property name="title"><string>Execução a validar</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoExecucao">
+<item>
+<widget class="QLabel" name="nota_grupoExecucao">
+<property name="text"><string>Com o registro (o JSON da execução), só falta o garimpo observado na data final. Sem ele, informe os arquivos à mão. K e a máscara são opcionais.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoExecucao">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_linhaRegistro">
+<property name="text"><string>Registro da execução</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>O &lt;prefixo&gt;_registro_&lt;data&gt;.json gravado pelo modelo dinâmico. Preenche os campos abaixo e confere, pelo SHA-256, se algum insumo mudou desde a execução.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<layout class="QHBoxLayout" name="layout_linhaRegistro">
+<item>
+<widget class="QLineEdit" name="linhaRegistro">
+<property name="toolTip"><string>O &lt;prefixo&gt;_registro_&lt;data&gt;.json gravado pelo modelo dinâmico. Preenche os campos abaixo e confere, pelo SHA-256, se algum insumo mudou desde a execução.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnRegistro">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_lblExecucao">
+<property name="text"><string>Execução</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Período, prefixo e eventos usados, lidos do registro.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="lblExecucao">
+<property name="toolTip"><string>Período, prefixo e eventos usados, lidos do registro.</string></property>
+<property name="placeholderText"><string>—</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_linhaPrevisto">
+<property name="text"><string>Expansão prevista (Δμ)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>O &lt;prefixo&gt;_expansao_&lt;data&gt;.tif da execução. A grade dele é a grade da validação.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<layout class="QHBoxLayout" name="layout_linhaPrevisto">
+<item>
+<widget class="QLineEdit" name="linhaPrevisto">
+<property name="toolTip"><string>O &lt;prefixo&gt;_expansao_&lt;data&gt;.tif da execução. A grade dele é a grade da validação.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnPrevisto">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="3" column="0">
+<widget class="QLabel" name="lbl_linhaMuInicial">
+<property name="text"><string>Garimpo na data inicial (μ₀)</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>O mesmo μ₀ usado na execução, em fração 0–1.</string></property>
+</widget>
+</item>
+<item row="3" column="1">
+<layout class="QHBoxLayout" name="layout_linhaMuInicial">
+<item>
+<widget class="QLineEdit" name="linhaMuInicial">
+<property name="toolTip"><string>O mesmo μ₀ usado na execução, em fração 0–1.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnMuInicial">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="4" column="0">
+<widget class="QLabel" name="lbl_linhaK">
+<property name="text"><string>K</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Habilita as linhas de base que usam o potencial (só K, remanescente, proximidade × remanescente).</string></property>
+</widget>
+</item>
+<item row="4" column="1">
+<layout class="QHBoxLayout" name="layout_linhaK">
+<item>
+<widget class="QLineEdit" name="linhaK">
+<property name="toolTip"><string>Habilita as linhas de base que usam o potencial (só K, remanescente, proximidade × remanescente).</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnK">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="5" column="0">
+<widget class="QLabel" name="lbl_linhaMascara">
+<property name="text"><string>Máscara da simulação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Valores &gt; 0. Sem máscara de avaliação, é também a área avaliada.</string></property>
+</widget>
+</item>
+<item row="5" column="1">
+<layout class="QHBoxLayout" name="layout_linhaMascara">
+<item>
+<widget class="QLineEdit" name="linhaMascara">
+<property name="toolTip"><string>Valores &gt; 0. Sem máscara de avaliação, é também a área avaliada.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnMascara">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoObservado">
+<property name="title"><string>Garimpo observado</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoObservado">
+<item>
+<widget class="QLabel" name="nota_grupoObservado">
+<property name="text"><string>A máscara de avaliação é opcional.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoObservado">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_linhaMuFinal">
+<property name="text"><string>Garimpo na data final</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, em fração 0–1 (ex.: MapBiomas, só a classe de garimpo).</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<layout class="QHBoxLayout" name="layout_linhaMuFinal">
+<item>
+<widget class="QLineEdit" name="linhaMuFinal">
+<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, em fração 0–1 (ex.: MapBiomas, só a classe de garimpo).</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnMuFinal">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linhaAvaliacao">
+<property name="text"><string>Máscara de avaliação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Onde as métricas são medidas, se for menor que a área simulada (ex.: a área de estudo, simulada com uma faixa de entorno).</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<layout class="QHBoxLayout" name="layout_linhaAvaliacao">
+<item>
+<widget class="QLineEdit" name="linhaAvaliacao">
+<property name="toolTip"><string>Onde as métricas são medidas, se for menor que a área simulada (ex.: a área de estudo, simulada com uma faixa de entorno).</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnAvaliacao">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoSubbacias">
+<property name="title"><string>Sub-bacias (opcional)</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSubbacias">
+<item>
+<layout class="QFormLayout" name="form_grupoSubbacias">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_comboSubbacias">
+<property name="text"><string>Camada de sub-bacias</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Compara a priorização prevista com a observada por sub-bacia (Spearman e coincidência do topo).</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QComboBox" name="comboSubbacias">
+<property name="toolTip"><string>Compara a priorização prevista com a observada por sub-bacia (Spearman e coincidência do topo).</string></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linhaCampoId">
+<property name="text"><string>Campo identificador</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Ex.: HYBAS_ID. Vazio usa o id interno da feição.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="linhaCampoId">
+<property name="toolTip"><string>Ex.: HYBAS_ID. Vazio usa o id interno da feição.</string></property>
+<property name="placeholderText"><string>HYBAS_ID</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaInsumos"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaParametros">
+<attribute name="title"><string>Métricas e saída</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaParametros">
+<item>
+<widget class="QGroupBox" name="grupoMetricas">
+<property name="title"><string>Métricas</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoMetricas">
+<item>
+<widget class="QLabel" name="nota_grupoMetricas">
+<property name="text"><string>O modelo é comparado com linhas de base sem dinâmica: a proximidade ao garimpo existente em 200, 300, 380 e 500 m e, com K, as que usam o potencial.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoMetricas">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_spinLimiar">
+<property name="text"><string>Limiar de garimpo novo</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Fração do pixel acima da qual o pixel conta como garimpo novo na AUC.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<widget class="QDoubleSpinBox" name="spinLimiar">
+<property name="toolTip"><string>Fração do pixel acima da qual o pixel conta como garimpo novo na AUC.</string></property>
+<property name="decimals"><number>3</number></property>
+<property name="minimum"><double>0.0</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.01</double></property>
+<property name="value"><double>0.02</double></property>
+</widget>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_spinBloco">
+<property name="text"><string>Bloco da correlação</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Tamanho dos blocos em que previsto e observado são somados antes da correlação.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QDoubleSpinBox" name="spinBloco">
+<property name="toolTip"><string>Tamanho dos blocos em que previsto e observado são somados antes da correlação.</string></property>
+<property name="decimals"><number>0</number></property>
+<property name="minimum"><double>1.0</double></property>
+<property name="maximum"><double>50000.0</double></property>
+<property name="singleStep"><double>100.0</double></property>
+<property name="value"><double>1000.0</double></property>
+<property name="suffix"><string> m</string></property>
+</widget>
+</item>
+<item row="2" column="0">
+<widget class="QLabel" name="lbl_spinTopo">
+<property name="text"><string>Topo das sub-bacias</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Fração das sub-bacias de maior expansão observada que se procura no topo previsto.</string></property>
+</widget>
+</item>
+<item row="2" column="1">
+<widget class="QDoubleSpinBox" name="spinTopo">
+<property name="toolTip"><string>Fração das sub-bacias de maior expansão observada que se procura no topo previsto.</string></property>
+<property name="decimals"><number>2</number></property>
+<property name="minimum"><double>0.01</double></property>
+<property name="maximum"><double>1.0</double></property>
+<property name="singleStep"><double>0.05</double></property>
+<property name="value"><double>0.1</double></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<widget class="QGroupBox" name="grupoSaida">
+<property name="title"><string>Onde gravar</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoSaida">
+<item>
+<widget class="QLabel" name="nota_grupoSaida">
+<property name="text"><string>Sempre gravados: &lt;prefixo&gt;_metricas.csv, &lt;prefixo&gt;_curva_captura.csv e &lt;prefixo&gt;_registro.json.</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QFormLayout" name="form_grupoSaida">
+<property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+<item row="0" column="0">
+<widget class="QLabel" name="lbl_linhaPasta">
+<property name="text"><string>Pasta de saída</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Vazio usa a pasta do registro da execução.</string></property>
+</widget>
+</item>
+<item row="0" column="1">
+<layout class="QHBoxLayout" name="layout_linhaPasta">
+<item>
+<widget class="QLineEdit" name="linhaPasta">
+<property name="toolTip"><string>Vazio usa a pasta do registro da execução.</string></property>
+</widget>
+</item>
+<item>
+<widget class="QToolButton" name="btnPasta">
+<property name="text"><string>…</string></property>
+<property name="toolTip"><string>Escolher…</string></property>
+</widget>
+</item>
+</layout>
+</item>
+<item row="1" column="0">
+<widget class="QLabel" name="lbl_linhaPrefixo">
+<property name="text"><string>Prefixo dos arquivos</string></property>
+<property name="wordWrap"><bool>true</bool></property>
+<property name="toolTip"><string>Vazio usa o prefixo da execução + _validacao.</string></property>
+</widget>
+</item>
+<item row="1" column="1">
+<widget class="QLineEdit" name="linhaPrefixo">
+<property name="toolTip"><string>Vazio usa o prefixo da execução + _validacao.</string></property>
+<property name="placeholderText"><string>PMT_validacao</string></property>
+</widget>
+</item>
+<item row="2" column="0" colspan="2">
+<widget class="QCheckBox" name="checkFigura">
+<property name="text"><string>Gravar a figura da curva de captura (PNG)</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+<item row="3" column="0" colspan="2">
+<widget class="QCheckBox" name="checkCarregar">
+<property name="text"><string>Carregar as sub-bacias no projeto</string></property>
+<property name="checked"><bool>true</bool></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+</item>
+<item>
+<spacer name="esp_abaParametros"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer>
+</item>
+</layout>
+</widget>
+<widget class="QWidget" name="abaRegistro">
+<attribute name="title"><string>Registro</string></attribute>
+<layout class="QVBoxLayout" name="layoutv_abaRegistro">
+<item>
+<widget class="QGroupBox" name="grupoLogValidacao">
+<property name="title"><string>Registro</string></property>
+<layout class="QVBoxLayout" name="layoutv_grupoLogValidacao">
+<item>
+<widget class="QPlainTextEdit" name="textoLog">
+<property name="readOnly"><bool>true</bool></property>
+<property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property>
+</widget>
+</item>
+</layout>
+</widget>
+</item>
+</layout>
+</widget>
+</widget>
+</item>
+<item>
+<widget class="QProgressBar" name="barraProgresso">
+<property name="value"><number>0</number></property>
+<property name="textVisible"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<layout class="QHBoxLayout" name="layoutBotoes">
+<item>
+<widget class="QLabel" name="lblStatus">
+<property name="text"><string>Pronto.</string></property>
+</widget>
+</item>
+<item>
+<spacer name="espBotoes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer>
+</item>
+<item>
+<widget class="QPushButton" name="btnExecutar">
+<property name="text"><string>Validar</string></property>
+<property name="default"><bool>true</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnCancelar">
+<property name="text"><string>Cancelar</string></property>
+<property name="enabled"><bool>false</bool></property>
+</widget>
+</item>
+<item>
+<widget class="QPushButton" name="btnFechar">
+<property name="text"><string>Fechar</string></property>
+</widget>
+</item>
+</layout>
+</item>
+</layout>
+</widget>
+ <resources/>
+ <connections/>
+</ui>
