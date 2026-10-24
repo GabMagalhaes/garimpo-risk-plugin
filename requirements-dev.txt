@@ -1,0 +1,6 @@
+# Dependências para rodar os testes fora do QGIS.
+# GDAL e QGIS não são necessários: os testes os substituem por dublês.
+numpy
+pytest
+# Opcional: sem SciPy, o núcleo usa as alternativas em NumPy.
+scipy

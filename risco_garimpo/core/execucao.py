@@ -17,6 +17,11 @@ A execução é deliberadamente partida em duas fases, por causa das regras de
 
 A agregação por sub-bacia volta à thread principal, pois escreve GeoPackage
 com a API vetorial do QGIS.
+
+Ao fim de ``executar`` grava-se o registro da execução
+(``<prefixo>_registro_<data>.json``, ver ``registro.py``); ``agregar`` o
+completa com o GeoPackage por sub-bacia. O registro anterior com o mesmo
+nome é apagado antes da primeira saída.
 """
 
 import datetime as _dt
@@ -25,6 +30,7 @@ import os
 import numpy as np
 
 from . import raster as _raster
+from . import registro as _registro
 from .eventos import CampoEventos, janelas_temporais
 from .frentes import agrupar_frentes, resumir_frentes
 from .model import Parametros, simular
@@ -104,16 +110,22 @@ class Preparo(object):
     """Dados simples produzidos na thread principal."""
 
     def __init__(self, grade, janelas_alertas=None, janelas_fiscalizacao=None,
-                 resumo=None):
+                 resumo=None, insumos=None, eventos=None, inicio=None):
         self.grade = grade
         self.janelas_alertas = janelas_alertas or []
         self.janelas_fiscalizacao = janelas_fiscalizacao or []
         self.resumo = resumo or {}
+        # para o registro da execução: camadas vetoriais já descritas (sem
+        # SHA-256, calculado em segundo plano) e contagens dos eventos
+        self.insumos = insumos or []
+        self.eventos = eventos or {}
+        self.inicio = inicio
 
 
 # --------------------------------------------------- fase 1 (thread principal)
 def preparar(config, log=None):
     """Define a grade de trabalho e extrai os eventos das camadas vetoriais."""
+    inicio = _registro.agora()
     config.validar()
 
     def _log(msg):
@@ -141,12 +153,20 @@ def preparar(config, log=None):
     resumo = {}
     janelas_alertas = []
     janelas_fisc = []
+    insumos = []
+    eventos = {}
 
     if config.camada_alertas is not None:
+        insumos.append(_registro.descrever_camada(
+            config.camada_alertas, "alertas",
+            campo_data=config.campo_data_alertas))
         x, y, datas, ignorados = extrair_eventos(
             config.camada_alertas, config.campo_data_alertas, grade)
         _log("Alertas lidos: %d (descartados por data ou geometria inválida: "
              "%d)" % (len(datas), ignorados))
+        info = eventos["alertas"] = {
+            "lidos": int(len(datas)), "descartados": int(ignorados),
+            "agrupados_em_frentes": bool(config.agrupar_em_frentes)}
         if len(datas):
             if config.agrupar_em_frentes:
                 rotulos = agrupar_frentes(x, y, config.raio_frente_m)
@@ -156,6 +176,8 @@ def preparar(config, log=None):
                      % (len(datas), config.raio_frente_m,
                         float(np.median(quantos))))
                 resumo["frentes"] = int(len(datas))
+                info["frentes"] = int(len(datas))
+                info["raio_frente_m"] = float(config.raio_frente_m)
             else:
                 _log("ATENÇÃO: alertas usados sem agrupamento em frentes. "
                      "Alertas vizinhos são fragmentos da mesma detecção; sem "
@@ -168,12 +190,19 @@ def preparar(config, log=None):
             primeira, ultima = (min(datas), max(datas))
             _log("Período dos alertas: %s a %s"
                  % (primeira.isoformat(), ultima.isoformat()))
+            info.update(fora_da_grade=fora, janelas=len(janelas_alertas),
+                        primeira_data=primeira, ultima_data=ultima)
 
     if config.camada_fiscalizacao is not None:
+        insumos.append(_registro.descrever_camada(
+            config.camada_fiscalizacao, "fiscalizacao",
+            campo_data=config.campo_data_fiscalizacao))
         x, y, datas, ignorados = extrair_eventos(
             config.camada_fiscalizacao, config.campo_data_fiscalizacao, grade)
         _log("Eventos de fiscalização lidos: %d (descartados: %d)"
              % (len(datas), ignorados))
+        info = eventos["fiscalizacao"] = {
+            "lidos": int(len(datas)), "descartados": int(ignorados)}
         if len(datas):
             janelas_fisc, fora = _para_janelas(x, y, datas, grade,
                                                config.janela_dias)
@@ -183,8 +212,22 @@ def preparar(config, log=None):
             primeira, ultima = (min(datas), max(datas))
             _log("Período dos autos: %s a %s"
                  % (primeira.isoformat(), ultima.isoformat()))
+            info.update(fora_da_grade=fora, janelas=len(janelas_fisc),
+                        primeira_data=primeira, ultima_data=ultima)
 
-    return Preparo(grade, janelas_alertas, janelas_fisc, resumo)
+    if config.camada_subbacias is not None:
+        insumos.append(_registro.descrever_camada(
+            config.camada_subbacias, "subbacias",
+            campo_id=config.campo_id_subbacias))
+    for insumo in insumos:
+        if insumo["alteracoes_nao_salvas"]:
+            _log("AVISO: a camada \"%s\" tem edições não salvas. O modelo usa "
+                 "as feições editadas, mas o registro identifica o arquivo "
+                 "em disco. Salve as edições para que a execução possa ser "
+                 "repetida." % insumo["nome"])
+
+    return Preparo(grade, janelas_alertas, janelas_fisc, resumo,
+                   insumos=insumos, eventos=eventos, inicio=inicio)
 
 
 def _para_janelas(x, y, datas, grade, janela_dias):
@@ -261,10 +304,52 @@ def executar(config, preparo, progresso=None, log=None):
     resultado.diagnostico.update(preparo.resumo)
 
     _passo(0.90, "Gravando rasters")
+    erro = _registro.remover(caminho_de_registro(config))
+    if erro:
+        _log("AVISO: não foi possível apagar o registro anterior (%s); se a "
+             "gravação do novo também falhar, ele não descreve esta "
+             "execução." % erro)
     saidas = _gravar(config, grade, resultado, K, mascara)
+    _passo(0.95, "Gravando o registro da execução")
+    caminho_registro = _registrar(config, preparo, saidas,
+                                  resultado.diagnostico, _log)
     _passo(1.0, "Concluído")
     return {"resultado": resultado, "grade": grade, "saidas": saidas,
-            "diagnostico": resultado.diagnostico}
+            "diagnostico": resultado.diagnostico,
+            "registro": caminho_registro}
+
+
+def caminho_de_registro(config):
+    """JSON com a configuração, os insumos e as saídas desta execução."""
+    return os.path.join(config.pasta_saida,
+                        "%s_registro_%s.json"
+                        % (config.prefixo or "risco",
+                           config.data_fim.strftime("%Y%m%d")))
+
+
+def _registrar(config, preparo, saidas, diagnostico, log):
+    """Grava o registro. Uma falha aqui não desfaz as saídas já gravadas."""
+    try:
+        insumos = [_registro.descrever_arquivo(caminho, papel)
+                   for papel, caminho in (("K", config.caminho_k),
+                                          ("mu0", config.caminho_mu0),
+                                          ("mascara", config.caminho_mascara))
+                   if caminho]
+        insumos += [_registro.identificar(insumo)
+                    for insumo in preparo.insumos]
+        dados = _registro.montar(
+            "modelo_dinamico",
+            _registro.configuracao_simples(config),
+            preparo.grade, insumos, saidas,
+            parametros=config.parametros, eventos=preparo.eventos,
+            resultados={"diagnostico": diagnostico}, inicio=preparo.inicio)
+        caminho = _registro.gravar(caminho_de_registro(config), dados)
+    except Exception as erro:  # noqa: BLE001 - registro não derruba a execução
+        log("AVISO: não foi possível gravar o registro da execução: %s"
+            % erro)
+        return None
+    log("Registro da execução: %s" % caminho)
+    return caminho
 
 
 def caminho_de_saida(config, nome):
@@ -335,8 +420,14 @@ def _gravar(config, grade, resultado, K, mascara):
 
 
 # --------------------------------------------------- fase 3 (thread principal)
-def agregar(config, grade, resultado, progresso=None):
-    """Agrega por sub-bacia e grava o GeoPackage. Thread principal."""
+def agregar(config, grade, resultado, progresso=None, log=None,
+            registro=None):
+    """Agrega por sub-bacia e grava o GeoPackage. Thread principal.
+
+    ``registro`` é o caminho devolvido por ``executar`` nesta mesma
+    execução; ``None`` (registro não gravado) deixa a pasta como está, para
+    não completar o registro de outra execução.
+    """
     if config.camada_subbacias is None:
         return None, None
     from .agregacao import agregar_resultado
@@ -347,4 +438,12 @@ def agregar(config, grade, resultado, progresso=None):
                                   config.data_fim.strftime("%Y%m%d")))
     tabela = agregar_resultado(resultado, grade, config.camada_subbacias,
                                config.campo_id_subbacias, caminho, progresso)
+    if registro and os.path.isfile(registro):
+        try:
+            _registro.acrescentar(registro, {"subbacias": caminho},
+                                  {"subbacias": len(tabela)})
+        except Exception as erro:  # noqa: BLE001 - registro não derruba
+            if log is not None:
+                log("AVISO: não foi possível completar o registro da "
+                    "execução: %s" % erro)
     return caminho, tabela

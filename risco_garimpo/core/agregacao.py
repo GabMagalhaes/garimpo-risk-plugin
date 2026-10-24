@@ -104,22 +104,28 @@ def agregar_resultado(resultado, grade, camada_zonas, campo_id=None,
                       caminho_saida=None, progresso=None):
     """Tabela por sub-bacia com expansão prevista, estoque e ranking.
 
+    Um pixel pertence à sub-bacia que contém o seu centro (``gdal.Rasterize``
+    sem ``allTouched``); onde polígonos se sobrepõem, vale o último.
+
     Colunas geradas:
 
     ``rg_exp_ha``
         expansão prevista no horizonte, em hectares equivalentes
         (Σ Δμ × área do pixel).
     ``rg_mu0_ha`` / ``rg_muf_ha``
-        estoque inicial e final, em hectares equivalentes.
+        estoque inicial e final, em hectares equivalentes. O inicial é o μ₀
+        já preparado pela simulação: truncado em K e zerado onde K = 0 ou
+        fora da máscara.
     ``rg_exp_rel``
-        expansão relativa ao estoque inicial (adimensional; ``-1`` quando não
-        havia estoque, isto é, chegada em área virgem).
-    ``rg_k_ha``
-        capacidade de suporte total da sub-bacia.
-    ``rg_ocup``
-        fração da capacidade já ocupada ao fim do horizonte.
+        expansão relativa ao estoque inicial, ``rg_exp_ha / rg_mu0_ha``
+        (adimensional; ``-1`` quando não havia estoque, isto é, chegada em
+        área virgem).
+    ``rg_px``
+        pixels da grade de trabalho atribuídos à sub-bacia, inclusive os
+        excluídos da simulação (K = 0 ou fora da máscara).
     ``rg_rank``
-        posição no ranking por expansão prevista (1 = maior).
+        posição no ranking por ``rg_exp_ha`` decrescente (1 = maior); empates
+        mantêm a ordem das feições na camada.
     """
     zonas, feicoes = rasterizar_zonas(camada_zonas, grade, progresso)
     n = len(feicoes)
@@ -162,22 +168,32 @@ def agregar_resultado(resultado, grade, camada_zonas, campo_id=None,
     return linhas
 
 
-def _escrever_gpkg(caminho, camada_original, feicoes, linhas):
+def campos_de_saida(linhas):
+    """Campos acrescentados ao GeoPackage: ``(nome, inteiro)`` por coluna.
+
+    Vêm das próprias linhas, na ordem em que foram montadas — ``rg_*`` no
+    modelo dinâmico, ``pa_*`` no estático —, exceto ``id``.
+    """
+    if not linhas:
+        return []
+    return [(chave, isinstance(valor, int) and not isinstance(valor, bool))
+            for chave, valor in linhas[0].items() if chave != "id"]
+
+
+def _escrever_gpkg(caminho, camada_original, feicoes, linhas,
+                   nome_camada="risco_subbacias"):
     from qgis.core import (QgsFeature, QgsField, QgsProject, QgsVectorLayer,
                            QgsVectorFileWriter, QgsWkbTypes)
     from qgis.PyQt.QtCore import QVariant
 
     tipo = QgsWkbTypes.displayString(camada_original.wkbType()) or "Polygon"
     saida = QgsVectorLayer("%s?crs=%s" % (tipo, camada_original.crs().authid()),
-                           "risco_subbacias", "memory")
+                           nome_camada, "memory")
     provedor = saida.dataProvider()
     campos = list(camada_original.fields())
-    novos = [QgsField("rg_exp_ha", QVariant.Double),
-             QgsField("rg_mu0_ha", QVariant.Double),
-             QgsField("rg_muf_ha", QVariant.Double),
-             QgsField("rg_exp_rel", QVariant.Double),
-             QgsField("rg_px", QVariant.Int),
-             QgsField("rg_rank", QVariant.Int)]
+    acrescentados = campos_de_saida(linhas)
+    novos = [QgsField(nome, QVariant.Int if inteiro else QVariant.Double)
+             for nome, inteiro in acrescentados]
     provedor.addAttributes(campos + novos)
     saida.updateFields()
 
@@ -187,16 +203,15 @@ def _escrever_gpkg(caminho, camada_original, feicoes, linhas):
         nova.setGeometry(feicao.geometry())
         for campo in campos:
             nova[campo.name()] = feicao[campo.name()]
-        for chave in ("rg_exp_ha", "rg_mu0_ha", "rg_muf_ha", "rg_exp_rel",
-                      "rg_px", "rg_rank"):
-            nova[chave] = linha[chave]
+        for nome, _inteiro in acrescentados:
+            nova[nome] = linha[nome]
         lote.append(nova)
     provedor.addFeatures(lote)
     saida.updateExtents()
 
     opcoes = QgsVectorFileWriter.SaveVectorOptions()
     opcoes.driverName = "GPKG"
-    opcoes.layerName = "risco_subbacias"
+    opcoes.layerName = nome_camada
     erro = QgsVectorFileWriter.writeAsVectorFormatV3(
         saida, caminho, QgsProject.instance().transformContext(), opcoes)
     if isinstance(erro, (list, tuple)) and erro[0] != QgsVectorFileWriter.NoError:

@@ -9,6 +9,10 @@ principal (`escrever`).
 A fronteira com o modelo dinâmico é de arquivo, não de chamada: aqui se
 grava `<prefixo>_K.tif`, e o modelo dinâmico o lê como qualquer outro
 raster. Nenhum dos dois importa o código do outro.
+
+`escrever` grava também `<prefixo>_registro.json`, com a configuração, a
+identificação dos insumos e as saídas (ver `registro.py`). O registro
+anterior é apagado antes da primeira saída.
 """
 
 import os
@@ -16,6 +20,7 @@ import os
 import numpy as np
 
 from . import estatico
+from . import registro as _registro
 from .raster import (escrever_raster, grade_de_raster, grade_reamostrada,
                      ler_alinhado)
 from .remanescente import agregar_potencial, remanescente, resumo_global
@@ -104,6 +109,8 @@ def grade_de_trabalho(config):
 # ----------------------------------------------------------------- fase 1
 def preparar(config, registrar=None):
     """Valida a configuração e monta a grade. Thread principal."""
+    inicio = _registro.agora()
+
     def log(msg):
         if registrar:
             registrar(msg)
@@ -143,8 +150,35 @@ def preparar(config, registrar=None):
     log("Variáveis: %s" % ", ".join(
         "%s (peso %.3f)" % (n, p) for n, p in zip(nomes, pesos)))
 
+    vetoriais = []
+    if config.camada_subbacias is not None:
+        vetoriais.append(_registro.descrever_camada(
+            config.camada_subbacias, "subbacias",
+            campo_id=config.campo_id_subbacia))
+        if vetoriais[-1]["alteracoes_nao_salvas"]:
+            log("AVISO: a camada de sub-bacias tem edições não salvas; o "
+                "registro identifica o arquivo em disco.")
+
     return {"grade": grade, "caminhos": caminhos, "pesos": pesos,
-            "nomes": nomes, "config": config}
+            "nomes": nomes, "config": config, "vetoriais": vetoriais,
+            "inicio": inicio}
+
+
+# papel de cada raster de entrada no registro da execução
+_INSUMOS = (("PGgeom", "caminho_ibx"), ("Est", "caminho_est"),
+            ("Lt", "caminho_lito"), ("mu", "caminho_mu"),
+            ("mu_antigo", "caminho_mu_antigo"),
+            ("mu_anterior", "caminho_mu_anterior"),
+            ("mascara", "caminho_mascara"), ("agua", "caminho_agua"))
+
+
+def _identificar_insumos(config, vetoriais, interromper=None):
+    """Identidade dos arquivos de entrada (SHA-256). Segundo plano."""
+    insumos = [_registro.descrever_arquivo(getattr(config, atributo), papel,
+                                           interromper)
+               for papel, atributo in _INSUMOS if getattr(config, atributo)]
+    return insumos + [_registro.identificar(v, interromper)
+                      for v in vetoriais]
 
 
 # ----------------------------------------------------------------- fase 2
@@ -251,9 +285,20 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
                "estimado da saturação observada" if config.estimar_nivel
                else "fixado na configuração"))
     passo(95)
+    try:
+        insumos = _identificar_insumos(config, preparado.get("vetoriais", []),
+                                       cancelado)
+    except _registro.Interrompido:
+        raise SimulacaoCancelada()
+    except Exception as erro:  # noqa: BLE001 - registro não derruba o cálculo
+        log("AVISO: não foi possível identificar os insumos: %s" % erro)
+        insumos = []
+    passo(98)
     return {"resultado": resultado, "grade": grade, "dentro": dentro,
             "config": config, "mu": mu, "mu_anterior": mu_anterior,
-            "remanescente": R, "totais": totais}
+            "remanescente": R, "totais": totais, "insumos": insumos,
+            "inicio": preparado.get("inicio"),
+            "variaveis": dict(zip(preparado["nomes"], preparado["pesos"]))}
 
 
 # ----------------------------------------------------------------- fase 3
@@ -269,17 +314,25 @@ def escrever(calculado, registrar=None):
             registrar(msg)
 
     os.makedirs(config.pasta_saida, exist_ok=True)
+    erro = _registro.remover(caminho_de_saida(config, "registro", "json"))
+    if erro:
+        log("AVISO: não foi possível apagar o registro anterior (%s); se a "
+            "gravação do novo também falhar, ele não descreve esta "
+            "execução." % erro)
     gravados = []
+    saidas = {}
 
     caminho_k = caminho_de_saida(config, "K")
     escrever_raster(caminho_k, resultado.K, grade, mascara=dentro)
     gravados.append(caminho_k)
+    saidas["K"] = caminho_k
     log("gravado: %s" % caminho_k)
 
     if config.salvar_escore:
         caminho = caminho_de_saida(config, "escore")
         escrever_raster(caminho, resultado.escore, grade, mascara=dentro)
         gravados.append(caminho)
+        saidas["escore"] = caminho
         log("gravado: %s" % caminho)
 
     if config.salvar_remanescente:
@@ -287,6 +340,7 @@ def escrever(calculado, registrar=None):
         escrever_raster(caminho, calculado["remanescente"], grade,
                         mascara=dentro)
         gravados.append(caminho)
+        saidas["remanescente"] = caminho
         log("gravado: %s" % caminho)
 
     if config.estimar_nivel and config.salvar_tabela \
@@ -305,8 +359,10 @@ def escrever(calculado, registrar=None):
                                  "" if not np.isfinite(sat) else "%.6f" % sat,
                                  ajustado))
         gravados.append(caminho)
+        saidas["saturacao"] = caminho
         log("gravado: %s" % caminho)
 
+    n_subbacias = None
     if config.camada_subbacias is not None:
         caminho = caminho_de_saida(config, "subbacias", "gpkg")
         linhas = agregar_potencial(
@@ -315,6 +371,8 @@ def escrever(calculado, registrar=None):
             campo_id=config.campo_id_subbacia, caminho_saida=caminho,
             dentro=dentro)
         gravados.append(caminho)
+        saidas["subbacias"] = caminho
+        n_subbacias = len(linhas)
         log("gravado: %s  (%d sub-bacias)" % (caminho, len(linhas)))
         melhores = sorted(linhas, key=lambda l: -l["pa_rem_ha"])[:5]
         log("maior potencial remanescente:")
@@ -323,4 +381,37 @@ def escrever(calculado, registrar=None):
                 % (linha["pa_rank"], str(linha["id"])[:18],
                    linha["pa_rem_ha"], 100.0 * linha["pa_expl"]))
 
+    caminho = _registrar(calculado, saidas, n_subbacias, log)
+    if caminho:
+        gravados.append(caminho)
     return gravados
+
+
+def _registrar(calculado, saidas, n_subbacias, log):
+    """Grava o registro. Uma falha aqui não desfaz as saídas já gravadas."""
+    config = calculado["config"]
+    resultado = calculado["resultado"]
+    try:
+        resultados = {
+            "teto_estimado": resultado.teto_estimado,
+            "nivel": ("estimado da saturação observada"
+                      if config.estimar_nivel else "fixado na configuração"),
+            "totais": calculado.get("totais"),
+            "veto": [{"variavel": nome, "fracao_zerada_sem_piso": fracao}
+                     for nome, _zeros, fracao in resultado.veto],
+            "variaveis": calculado.get("variaveis"),
+        }
+        if n_subbacias is not None:
+            resultados["subbacias"] = n_subbacias
+        dados = _registro.montar(
+            "modelo_estatico", _registro.configuracao_simples(config),
+            calculado["grade"], calculado.get("insumos", []), saidas,
+            resultados=resultados, inicio=calculado.get("inicio"))
+        caminho = _registro.gravar(
+            caminho_de_saida(config, "registro", "json"), dados)
+    except Exception as erro:  # noqa: BLE001 - registro não derruba a escrita
+        log("AVISO: não foi possível gravar o registro da execução: %s"
+            % erro)
+        return None
+    log("gravado: %s" % caminho)
+    return caminho

@@ -1,0 +1,66 @@
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 corresponde ao Python embarcado no QGIS 3.22 (versão mínima).
+        python: ["3.9", "3.12"]
+        scipy: [com, sem]
+    name: Python ${{ matrix.python }} (${{ matrix.scipy }} SciPy)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.scipy }}" = "com" ]; then
+            pip install -r requirements-dev.txt
+          else
+            pip install numpy pytest
+          fi
+      - name: Rodar testes
+        run: python -m pytest tests -q
+
+  qgis:
+    # Roda com o QGIS e a GDAL de verdade, inclusive o roteiro ponta a ponta
+    # (tests/test_qgis_ponta_a_ponta.py), que os dublês não substituem.
+    runs-on: ubuntu-24.04
+    name: QGIS 3.34 do Ubuntu (ponta a ponta)
+    # o espelho do apt às vezes leva minutos por pacote (3 de 6 execuções
+    # chegaram a 15–34 min só para instalar); os .deb ficam em cache e só a
+    # primeira execução depende do espelho. Sem limite, um job travado
+    # seguraria o PR por até 6 h
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache dos pacotes do QGIS
+        uses: actions/cache@v4
+        with:
+          path: ~/apt-cache
+          # troque o sufixo para renovar os pacotes guardados
+          key: apt-qgis-ubuntu-24.04-v1
+      - name: Instalar QGIS
+        timeout-minutes: 30
+        run: |
+          mkdir -p ~/apt-cache/partial
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 \
+            -o Dir::Cache::Archives="$HOME/apt-cache" \
+            install -y --no-install-recommends \
+            python3-qgis python3-gdal python3-pytest qgis-providers
+          sudo rm -rf ~/apt-cache/partial ~/apt-cache/lock
+          sudo chown -R "$USER" ~/apt-cache
+      - name: Rodar testes
+        env:
+          QT_QPA_PLATFORM: offscreen
+          EXIGIR_QGIS: "1"
+        run: /usr/bin/python3 -m pytest tests -q

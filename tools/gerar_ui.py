@@ -285,7 +285,8 @@ def construir():
                      decimais=2, minimo=0.0, maximo=1.0, passo=0.05,
                      valor=0.8),
                campo("double", "spinFiscEscala", "Alcance espacial",
-                     "O efeito repressivo se concentra em 0,5–1 km.",
+                     "Referência sem ajuste formal: o efeito se distingue "
+                     "do placebo até 500 m e não a partir de 1 km.",
                      decimais=0, minimo=10.0, maximo=20000.0, passo=50.0,
                      valor=750.0, sufixo="m"),
                campo("double", "spinFiscSubida", "k — subida",

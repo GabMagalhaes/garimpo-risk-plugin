@@ -25,8 +25,21 @@ onde
     ativação por alertas — decaimento exponencial no espaço e no tempo,
     contínuo desde o dia zero.
 ``F(x,t)``
-    supressão por fiscalização — platô logístico no tempo (~180 dias),
-    decaimento exponencial no espaço (0,5–1 km).
+    supressão por fiscalização — platô logístico no tempo, decaimento
+    exponencial no espaço. Origem dos valores padrão, no artigo do autor
+    submetido ao SICOD 2026 ("Efeito temporal da fiscalização ambiental
+    sobre a expansão do garimpo ilegal"):
+
+    * **platô de 180 dias** — janela escolhida pela comparação antes/depois
+      em janelas cumulativas (Seções 3.6 e 4.2, Figura 1, Tabela 1) e
+      corroborada pelo event-study (Seção 4.5, Figura 3), em que o efeito
+      líquido deixa de se distinguir do placebo perto desse limite.
+      ``fisc_k_subida`` e ``fisc_k_queda`` não foram ajustados: o artigo
+      não estima a inclinação da logística.
+    * **alcance de 750 m** — valor de referência dentro da faixa de
+      0,5–1 km, sem ajuste formal. O artigo (Seção 4.4, Figura 2) distingue
+      o efeito do placebo no buffer de 500 m e o perde a partir de 1 km;
+      não estima ``d₀``.
 
 A propagação é euclidiana, não hidrológica, e ocorre **no pixel**. A
 sub-bacia é unidade de saída e reporte; agregar antes de propagar dilui o

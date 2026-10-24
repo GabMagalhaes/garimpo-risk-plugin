@@ -133,8 +133,8 @@ def _aparelhar_zonas(monkeypatch, zonas, feicoes):
                         (zonas, feicoes))
     gravados = {}
     monkeypatch.setattr(mod, "_escrever_gpkg",
-                        lambda caminho, camada, feicoes_, linhas:
-                        gravados.update(caminho=caminho, linhas=linhas))
+                        lambda caminho, camada, feicoes_, linhas, **kw:
+                        gravados.update(caminho=caminho, linhas=linhas, **kw))
     return gravados
 
 
@@ -271,3 +271,25 @@ def test_agregar_somando_bate_com_o_total_global(monkeypatch):
         pytest.approx(total["remanescente_ha"], rel=1e-9)
     assert sum(l["pa_k_ha"] for l in linhas) == \
         pytest.approx(total["potencial_ha"], rel=1e-9)
+
+
+def test_geopackage_do_estatico_leva_os_campos_pa(monkeypatch):
+    """O gravador tinha os campos rg_* fixos e quebrava com as linhas pa_*."""
+    from risco_garimpo.core.agregacao import campos_de_saida
+    from risco_garimpo.core.remanescente import agregar_potencial
+
+    zonas = np.array([[0, 0, 1, 1],
+                      [0, 0, 1, 1]], dtype=np.int64)
+    gravados = _aparelhar_zonas(monkeypatch, zonas,
+                                [_Feicao(1, "A"), _Feicao(2, "B")])
+    K = np.full(zonas.shape, 0.5)
+    mu = np.zeros(zonas.shape)
+    agregar_potencial(K, mu, _Grade(), object(), caminho_saida="/s.gpkg",
+                      mu_anterior=mu)
+    campos = campos_de_saida(gravados["linhas"])
+    nomes = [nome for nome, _ in campos]
+    assert nomes == ["pa_k_ha", "pa_mu_ha", "pa_rem_ha", "pa_expl",
+                     "pa_exc_ha", "pa_px", "pa_rank", "pa_var_ha", "pa_anos"]
+    inteiros = {nome for nome, inteiro in campos if inteiro}
+    assert inteiros == {"pa_px", "pa_rank"}
+    assert gravados["nome_camada"] == "potencial_subbacias"
