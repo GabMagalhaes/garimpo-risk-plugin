@@ -120,21 +120,27 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
     dados = espaco["gerar"](str(tmp_path))
     pasta = tmp_path / "roteiros"
     pasta.mkdir()
-    for arquivo in ("calibrar_noite.py", "calibrar_paralelo.py"):
-        shutil.copy(os.path.join(RAIZ, "tools", arquivo), str(pasta))
+    # o CONFIG vai num arquivo com outro nome, passado como 3º argumento
+    shutil.copy(os.path.join(RAIZ, "tools", "calibrar_paralelo.py"),
+                str(pasta))
+    shutil.copy(os.path.join(RAIZ, "tools", "calibrar_noite.py"),
+                str(pasta / "calibrar_periodo.py"))
     saida = str(tmp_path / "saida")
-    with open(str(pasta / "calibrar_noite.py"), "a", encoding="utf-8") as f:
+    with open(str(pasta / "calibrar_periodo.py"), "a", encoding="utf-8") as f:
         f.write("\nCONFIG.update(K=%r, MU_INICIAL=%r, MU_FINAL=%r, MASCARA=%r,"
                 " MASCARA_AVALIACAO=None, ALERTAS=%r, CAMPO_DATA_ALERTAS='data',"
                 " AUTOS=%r, CAMPO_DATA_AUTOS='data', DATA_INICIAL='2025-01-01',"
                 " DATA_FINAL='2026-12-31', RESOLUCAO_M=200.0, PASTA_SAIDA=%r,"
-                " N_ALEATORIAS=3, ESTRUTURA=True, HORAS_MAXIMAS=1.0)\n"
+                " N_ALEATORIAS=3, ESTRUTURA=True, HORAS_MAXIMAS=1.0,"
+                " CONFIGURACOES_EXTRAS=[{'r0': 0.003,"
+                " 'escala_contagio_m': 150.0, 'k_fator': 1.5}])\n"
                 % (dados["K"], dados["mu0"], dados["K"], dados["mascara"],
                    dados["eventos"] + "|layername=alertas",
                    dados["eventos"] + "|layername=autos", saida))
     ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
     processo = subprocess.run(
-        [sys.executable, str(pasta / "calibrar_paralelo.py"), "2"],
+        [sys.executable, str(pasta / "calibrar_paralelo.py"), "2",
+         "calibrar_periodo.py"],
         env=ambiente, capture_output=True, text=True, timeout=600)
     assert processo.returncode == 0, processo.stdout + processo.stderr
 
@@ -143,7 +149,8 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
         linhas = list(csv.DictReader(f, delimiter=";"))
     etapas = {l["etapa"] for l in linhas}
     assert {"linha_de_base", "padrao", "r0", "calibrado", "fiscal",
-            "estrutura", "aleatoria"} <= etapas
+            "estrutura", "extra", "aleatoria"} <= etapas
+    assert "base_proximidade_100m" in {l["id"] for l in linhas}
     assert not [l for l in linhas if l["erro"]]
     assert any(l["k_fator"] == "100" for l in linhas)
     assert os.path.isfile(os.path.join(saida, "resumo.txt"))

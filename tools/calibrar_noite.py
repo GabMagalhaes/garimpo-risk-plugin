@@ -100,6 +100,11 @@ CONFIG = dict(
     # etapa "estrutura": saturação por K mais frouxa (K × fator) e escalas de
     # contágio menores, nos dois modos. Exige PASTA_SAIDA nova (coluna k_fator)
     ESTRUTURA=False,
+    # combinações escolhidas em OUTRO período, rodadas tal como vieram (com o
+    # r0 delas, sem recalibrar), nos dois modos: o teste honesto de uma
+    # escolha. Ex.: [{"r0": 0.0007, "escala_contagio_m": 100.0,
+    # "k_fator": 1.5}]. As chaves são as de Parametros, mais k_fator
+    CONFIGURACOES_EXTRAS=[],
 )
 
 # faixas exploradas (edite à vontade; o padrão do plugin está em Parametros)
@@ -111,7 +116,10 @@ CONFIG = dict(
 R0 = [0.0001, 0.00015, 0.0002, 0.0003, 0.0004, 0.0005, 0.0007, 0.001, 0.002]
 # escalas de proximidade das linhas de base (m): o modelo é comparado com a
 # melhor delas, não só com a de 380 m
-ESCALAS_BASE_M = [200.0, 250.0, 300.0, 380.0, 500.0]
+# v2 (2020→2022): o melhor modelo usou contágio de 100 m; a comparação justa
+# pede a proximidade também em 100 e 150 m. Escalas novas só acrescentam
+# linhas de base: os ids das simulações não mudam
+ESCALAS_BASE_M = [100.0, 150.0, 200.0, 250.0, 300.0, 380.0, 500.0]
 SENSIBILIDADE = {
     "alerta_peso": [0.0, 0.5, 2.0, 4.0],
     "alerta_semeia": [False],
@@ -555,6 +563,15 @@ def _plano_restante(padrao, r0):
 
     item("calibrado", "reconstrucao")
     item("calibrado", "previsao")
+    padrao_base = {c: getattr(padrao, c) for c in PARAMETROS_CSV}
+    for extra in CONFIG.get("CONFIGURACOES_EXTRAS") or []:
+        mudancas = dict(extra)
+        if float(mudancas.get("k_fator", 1.0)) == 1.0:
+            mudancas.pop("k_fator", None)     # fator 1 = mesmo id de sempre
+        for modo in ("previsao", "reconstrucao"):
+            params = dict(padrao_base)        # o r0 vem da extra, não daqui
+            params.update(mudancas)
+            itens.append({"etapa": "extra", "modo": modo, "params": params})
     for nome, valores in SENSIBILIDADE.items():
         for valor in valores:
             item("sensibilidade", "reconstrucao", **{nome: valor})
@@ -918,6 +935,22 @@ def resumir(imprimir=True):
                             _mediana([l["captura_5"] for l in grupo]),
                             _mediana([l.get("perto_autos_auc", float("nan"))
                                       for l in grupo])))
+    extras = [l for l in sims if l["etapa"] == "extra"]
+    if extras:
+        escrever("")
+        escrever("7) CONFIGURAÇÕES EXTRAS (escolhidas fora deste período, rodadas "
+                 "como vieram) — compare com a melhor linha de base (AUC %.3f, "
+                 "cap5 %.3f)"
+                 % (max([b["auc"] for b in bases] or [float("nan")]),
+                    max([b["captura_5"] for b in bases] or [float("nan")])))
+        escrever("  %-12s %9s %7s %7s %7s %7s %7s"
+                 % ("modo", "r0", "k_fator", "escala", "AUC", "cap5", "área"))
+        for l in sorted(extras, key=lambda l: (l["modo"], l["r0"],
+                                               l["escala_contagio_m"])):
+            escrever("  %-12s %9.4g %7.4g %7.0f %7.3f %7.3f %7s"
+                     % (l["modo"], l["r0"], l["k_fator"],
+                        l["escala_contagio_m"], l["auc"], l["captura_5"],
+                        _f(l.get("razao_area"))))
     estrutura = [l for l in sims if l["etapa"] == "estrutura"
                  or _so_muda_a_escala(l, sims)]
     if any(l["etapa"] == "estrutura" for l in estrutura):

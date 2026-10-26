@@ -353,7 +353,7 @@ Do registro saem a expansão prevista, `μ₀`, `K`, a máscara e as datas. O SH
 
 | Arquivo | Conteúdo |
 |---|---|
-| `_metricas.csv` | Uma linha para o modelo e uma para cada linha de base, com todas as métricas da tabela acima. |
+| `_metricas.csv` | Uma linha para o modelo e uma para cada linha de base (proximidade em 100, 150, 200, 300, 380 e 500 m e, com `K`, as que usam o potencial), com todas as métricas da tabela acima. |
 | `_curva_captura.csv` e `_curva_captura.png` | Curva de captura do modelo e das linhas de base; a figura traz o modelo, a melhor linha de base e o acaso. A figura exige matplotlib, que acompanha o QGIS. |
 | `_subbacias.gpkg` | Com uma camada de sub-bacias: `va_prev_ha` e `va_obs_ha`, as áreas novas prevista e observada, e `va_rank_prev` e `va_rank_obs`, as posições nas duas ordenações. |
 | `_registro.json` | Registro da validação, com as métricas, os avisos e o SHA-256 dos insumos. |

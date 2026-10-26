@@ -265,7 +265,7 @@
 <layout class="QVBoxLayout" name="layoutv_grupoMetricas">
 <item>
 <widget class="QLabel" name="nota_grupoMetricas">
-<property name="text"><string>O modelo é comparado com linhas de base sem dinâmica: a proximidade ao garimpo existente em 200, 300, 380 e 500 m e, com K, as que usam o potencial.</string></property>
+<property name="text"><string>O modelo é comparado com linhas de base sem dinâmica: a proximidade ao garimpo existente em 100, 150, 200, 300, 380 e 500 m e, com K, as que usam o potencial.</string></property>
 <property name="wordWrap"><bool>true</bool></property>
 </widget>
 </item>

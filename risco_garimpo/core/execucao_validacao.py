@@ -34,7 +34,9 @@ from . import registro as _registro
 from . import validacao as _v
 from .raster import grade_de_raster, ler_alinhado
 
-ESCALAS_BASE_M = (200.0, 300.0, 380.0, 500.0)
+# a calibração com dados reais (150 m) teve o melhor resultado com contágio de
+# 100 m; a linha de base mais fina precisa estar à altura
+ESCALAS_BASE_M = (100.0, 150.0, 200.0, 300.0, 380.0, 500.0)
 CAMPOS_ZONA = ("va_prev_ha", "va_obs_ha", "va_rank_prev", "va_rank_obs")
 
 

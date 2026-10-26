@@ -15,7 +15,11 @@ COMO USAR
 
        python-qgis-ltr "C:\\caminho\\calibrar_paralelo.py" 12
 
-   O número no fim é a quantidade de processos (padrão 12).
+   O número no fim é a quantidade de processos (padrão 12). Um terceiro
+   argumento troca o arquivo de CONFIG (o padrão é o calibrar_noite.py da
+   mesma pasta), para manter uma cópia por período:
+
+       python-qgis-ltr "C:\\caminho\\calibrar_paralelo.py" 12 calibrar_teste.py
 4. Acompanhe calibracao.log na PASTA_SAIDA. Para parar com segurança,
    crie PARAR.txt na PASTA_SAIDA: as simulações em andamento terminam e
    são gravadas; nenhuma nova começa.
@@ -52,6 +56,8 @@ from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from concurrent.futures.process import BrokenProcessPool
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
+# o calibrar_noite.py (com o CONFIG) que este processo usa; o principal o
+# troca pelo 2º argumento e o repassa aos trabalhadores
 SCRIPT = os.path.join(PASTA, "calibrar_noite.py")
 # onde o QGIS instala os plugins (o Risco Garimpo está aqui)
 PLUGINS = os.path.join(os.environ.get("APPDATA", ""), "QGIS", "QGIS3",
@@ -94,7 +100,7 @@ def _carregar():
 # -------------------------------------------------------------------------
 # trabalhadores
 # -------------------------------------------------------------------------
-def _iniciar_trabalhador(semaforo=None):
+def _iniciar_trabalhador(semaforo=None, script=None):
     """Prepara o contexto (dados alinhados na grade) uma vez por processo.
 
     Reaproveita o verificar() do calibrar_noite.py, mas sem as partes que
@@ -102,7 +108,9 @@ def _iniciar_trabalhador(semaforo=None):
     linhas de base e não roda a simulação de teste (que custaria ~4 min
     em cada processo).
     """
-    global _NS, _ERRO_PREPARO
+    global _NS, _ERRO_PREPARO, SCRIPT
+    if script:
+        SCRIPT = script
     if semaforo is not None:
         semaforo.acquire()
     try:
@@ -249,7 +257,7 @@ def principal(n):
     try:
         with ProcessPoolExecutor(max_workers=n, mp_context=contexto,
                                  initializer=_iniciar_trabalhador,
-                                 initargs=(semaforo,)) as pool:
+                                 initargs=(semaforo, SCRIPT)) as pool:
             feitos = ns["_ids_feitos"]()
             try:
                 resumo, bases = pool.submit(_linhas_de_base, feitos).result()
@@ -288,6 +296,10 @@ class _Parado(Exception):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        SCRIPT = os.path.abspath(os.path.join(PASTA, sys.argv[2]))
+        if not os.path.isfile(SCRIPT):
+            sys.exit("arquivo de CONFIG não encontrado: %s" % SCRIPT)
     try:
         principal(int(sys.argv[1]) if len(sys.argv) > 1 else 12)
     except _Parado:

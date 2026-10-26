@@ -84,8 +84,8 @@ def construir():
                      valor=0.10, minimo=0.01, maximo=1.0, passo=0.05,
                      decimais=2)],
               nota="O modelo é comparado com linhas de base sem dinâmica: a "
-                   "proximidade ao garimpo existente em 200, 300, 380 e "
-                   "500 m e, com K, as que usam o potencial."),
+                   "proximidade ao garimpo existente em 100, 150, 200, 300, "
+                   "380 e 500 m e, com K, as que usam o potencial."),
         grupo("grupoSaida", "Onde gravar",
               [campo("linha_arquivo", "linhaPasta", "Pasta de saída",
                      "Vazio usa a pasta do registro da execução.",
