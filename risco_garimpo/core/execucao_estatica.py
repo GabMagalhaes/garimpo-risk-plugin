@@ -230,9 +230,8 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
     if config.caminho_mu_antigo:
         antigo = np.clip(ler_alinhado(config.caminho_mu_antigo, grade,
                                       "average"), 0.0, 1.0)
-        vizinhanca = estatico.ocupacao_local(antigo, grade.pixel_m,
-                                             config.janela_m)
-        maduro = dentro & (vizinhanca > 0)
+        maduro = dentro & estatico.maduros(antigo, grade.pixel_m,
+                                           config.janela_m)
         log("pixels maduros (exposição longa): %.1f%% da área válida"
             % (100.0 * maduro.sum() / max(dentro.sum(), 1)))
     passo(55)

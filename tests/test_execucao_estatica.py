@@ -237,3 +237,26 @@ def test_maturidade_restringe_a_amostra_do_nivel(monkeypatch):
                                       n_faixas=15, minimo_por_faixa=50)))
     assert saida["resultado"].K.max() <= 1.0
     assert saida["resultado"].teto_estimado > 0.0
+
+
+def test_maturidade_e_so_onde_o_mapa_antigo_tem_garimpo(monkeypatch):
+    """O ruído da FFT (~1e-7) não pode tornar madura a área sem garimpo.
+
+    Com ``vizinhança > 0``, cerca de metade da área saía madura.
+    """
+    import risco_garimpo.core.execucao_estatica as mod
+    grade = _GradeFalsa(nx=300, ny=300)
+    pggeom, mu = _mundo(grade, semente=3)
+    antigo = np.zeros(grade.shape, dtype=np.float32)
+    antigo[150:157, 150:157] = 1.0       # 7 × 7 pixels de garimpo antigo
+    _aparelhar(monkeypatch, mod, grade,
+               {"/dados/pggeom.tif": pggeom, "/dados/mu.tif": mu,
+                "/dados/antigo.tif": antigo})
+    mensagens = []
+    executar(preparar(_config(caminho_mu_antigo="/dados/antigo.tif",
+                              n_faixas=5, minimo_por_faixa=10)),
+             registrar=mensagens.append)
+    linha = [m for m in mensagens if m.startswith("pixels maduros")][0]
+    # janela de 13 × 13 pixels a 30 m: o bloco vira (7 + 12)² = 361 pixels,
+    # 0,4% da grade de 90.000
+    assert "0.4%" in linha, linha

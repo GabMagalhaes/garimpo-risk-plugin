@@ -67,6 +67,18 @@ def _esperar(dialogo, segundos=300):
     assert dialogo.tarefa is None, "a tarefa não terminou em %d s" % segundos
 
 
+def _sem_janelas_modais(modulo):
+    """Troca os QMessageBox de aviso e erro por uma lista.
+
+    Fora da tela, uma janela modal não tem quem a feche e o roteiro
+    trava; assim, o erro aparece na asserção.
+    """
+    mensagens = []
+    modulo.QMessageBox.warning = lambda *a, **k: mensagens.append(a[-1])
+    modulo.QMessageBox.critical = lambda *a, **k: mensagens.append(a[-1])
+    return mensagens
+
+
 def _selecionar(combo, camada):
     indice = combo.findData(camada.id())
     assert indice >= 0, (combo.objectName(), camada.name())
@@ -89,12 +101,14 @@ def _plugin(iface):
 
 
 def _estatico(iface, pasta, K, mu0, mascara):
-    from risco_garimpo.ui.estatico_dialog import EstaticoDialog
-    dialogo = EstaticoDialog(iface)
+    import risco_garimpo.ui.estatico_dialog as modulo
+    erros = _sem_janelas_modais(modulo)
+    dialogo = modulo.EstaticoDialog(iface)
     dialogo.show()
+    # sem o mapa do ano mais antigo: os três focos sintéticos dão poucos
+    # pixels maduros para estimar o nível (a maturidade tem testes próprios)
     _selecionar(dialogo.comboIBx, K)
     _selecionar(dialogo.comboMu, mu0)
-    _selecionar(dialogo.comboMuAntigo, mu0)
     _selecionar(dialogo.comboMascara, mascara)
     dialogo.spinResolucao.setValue(100.0)
     dialogo.linhaPasta.setText(os.path.join(pasta, "estatico"))
@@ -103,7 +117,7 @@ def _estatico(iface, pasta, K, mu0, mascara):
     _esperar(dialogo)
     log = dialogo.textoLog.toPlainText()
     assert dialogo.lblStatus.text() == "Pronto.", (dialogo.lblStatus.text(),
-                                                   log)
+                                                   log, erros)
     for nome in ("dlg_K.tif", "dlg_registro.json"):
         assert os.path.isfile(os.path.join(pasta, "estatico", nome)), log
     dialogo.close()
@@ -111,6 +125,7 @@ def _estatico(iface, pasta, K, mu0, mascara):
 
 def _dinamico(iface, pasta, K, mu0, mascara, alertas, autos):
     import risco_garimpo.ui.main_dialog as modulo
+    erros = _sem_janelas_modais(modulo)
     dialogo = modulo.RiscoGarimpoDialog(iface)
     dialogo.show()
     _selecionar(dialogo.comboK, K)
@@ -125,11 +140,11 @@ def _dinamico(iface, pasta, K, mu0, mascara, alertas, autos):
     dialogo.linePrefixo.setText("dlg")
     dialogo.checkCarregar.setChecked(True)
     dialogo._executar()          # grava as preferências antes de rodar
-    assert dialogo.tarefa is not None, dialogo.textoLog.toPlainText()
+    assert dialogo.tarefa is not None, (dialogo.textoLog.toPlainText(), erros)
     _esperar(dialogo)
     log = dialogo.textoLog.toPlainText()
     assert dialogo.lblStatus.text() == "Concluído.", (dialogo.lblStatus.text(),
-                                                      log)
+                                                      log, erros)
     assert iface.barra.mensagens, "sem mensagem de conclusão"
     camadas = {c.name(): c for c in QgsProject.instance().mapLayers().values()}
     expansao = camadas.get("Expansão prevista (Δμ)")

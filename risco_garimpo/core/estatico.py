@@ -105,11 +105,28 @@ def ocupacao_local(mu, pixel_m, janela_m=380.0):
     a escala de contágio estimada para a província.
     """
     mu = np.asarray(mu, dtype=np.float32)
-    raio = max(1, int(round(janela_m / (2.0 * float(pixel_m)))))
-    lado = 2 * raio + 1
+    lado = lado_da_janela(pixel_m, janela_m)
     nucleo = np.ones((lado, lado), dtype=np.float32)
     nucleo /= nucleo.sum()
     return np.clip(convolver(mu, nucleo), 0.0, 1.0).astype(np.float32)
+
+
+def lado_da_janela(pixel_m, janela_m=380.0):
+    """Lado da janela de ocupação, em pixels (ímpar; 13 a 30 m e 380 m)."""
+    return 2 * max(1, int(round(janela_m / (2.0 * float(pixel_m))))) + 1
+
+
+def maduros(mu_antigo, pixel_m, janela_m=380.0):
+    """Pixels de exposição longa: garimpo do mapa antigo na janela de ocupação.
+
+    Madura é a janela com ao menos meio pixel de garimpo antigo. Comparar a
+    ocupação local com zero não serve: a convolução por FFT deixa ruído da
+    ordem de 1e-7 onde não há garimpo nenhum, metade dele positivo, e cerca
+    de metade da área sairia madura. Um único pixel de garimpo na janela de
+    13 × 13 já vale 1/169 ≈ 0,006, muito acima do ruído.
+    """
+    lado = lado_da_janela(pixel_m, janela_m)
+    return ocupacao_local(mu_antigo, pixel_m, janela_m) >= 0.5 / lado ** 2
 
 
 def isotonica(y, peso=None):

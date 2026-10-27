@@ -133,7 +133,7 @@ Uma evidência igual a zero, com peso positivo, anula o produto. O **Piso das va
 
 O projeto estima o nível de `K` por **substituição espaço-tempo**: utiliza locais com maior tempo de exposição ao processo como referência para a ocupação que terrenos semelhantes podem alcançar.
 
-Para cada classe de favorabilidade, calcula-se um quantil alto da ocupação local, medida em uma janela associada à escala de contágio. Um quantil alto é um valor abaixo do qual se encontra uma parcela elevada das observações. O ajuste por **PAVA** reúne classes adjacentes que violam a ordem crescente e produz uma curva monotônica entre escore e capacidade [P1, 3].
+Para cada classe de favorabilidade, calcula-se um quantil alto da ocupação local, medida em uma janela associada à escala de contágio. Entram só os pixels de exposição longa: aqueles cuja janela tem garimpo no mapa do ano mais antigo, ao menos meio pixel. Até a versão 0.3.5, o ruído numérico da convolução fazia cerca de metade da área contar como madura, o que puxava o nível para baixo; um K gerado com o mapa do ano mais antigo antes da 0.3.6 deve ser gerado de novo. Um quantil alto é um valor abaixo do qual se encontra uma parcela elevada das observações. O ajuste por **PAVA** reúne classes adjacentes que violam a ordem crescente e produz uma curva monotônica entre escore e capacidade [P1, 3].
 
 | Símbolo | Significado | Unidade ou intervalo | Fonte |
 |---|---|---|---|
