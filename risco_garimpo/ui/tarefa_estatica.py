@@ -6,6 +6,8 @@ import traceback
 from qgis.core import QgsTask
 from qgis.PyQt.QtCore import pyqtSignal
 
+from .. import compat
+
 from ..core.execucao_estatica import SimulacaoCancelada, executar
 
 
@@ -15,7 +17,8 @@ class TarefaEstatica(QgsTask):
     registro = pyqtSignal(str)
 
     def __init__(self, preparo):
-        super().__init__("Modelo estático — geração de K", QgsTask.CanCancel)
+        super().__init__("Modelo estático — geração de K",
+                         compat.tarefa_cancelavel())
         self.preparo = preparo
         self.saida = None
         self.excecao = None

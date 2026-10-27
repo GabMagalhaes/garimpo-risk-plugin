@@ -14,7 +14,7 @@ As equações abaixo descrevem a formulação documentada pelo projeto [P1]. As 
 
 ## Instalação e teste inicial
 
-Requisito indicado pelo projeto: **QGIS 3.22 ou posterior**. NumPy e GDAL são utilizados no processamento. SciPy acelera a convolução e a transformada de distância; o projeto prevê alternativas em NumPy para ambientes sem SciPy.
+Requisito indicado pelo projeto: **QGIS 3.22 ou posterior, inclusive o QGIS 4** (Qt6); os testes rodam no QGIS 3.34 e no 4.2. NumPy e GDAL são utilizados no processamento. SciPy acelera a convolução e a transformada de distância; o projeto prevê alternativas em NumPy para ambientes sem SciPy.
 
 1. Na pasta do projeto, execute `python tools/empacotar.py`.
 2. No QGIS, abra **Complementos → Gerenciar e instalar complementos → Instalar a partir do ZIP** e selecione `dist/risco_garimpo-<versão>.zip`.
@@ -379,6 +379,7 @@ Para que a comparação tenha sentido, o modelo precisa superar alternativas sem
 | `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
 | `core/validacao.py` | Métricas de validação da expansão prevista contra o garimpo novo observado. |
 | `core/execucao_validacao.py` | Orquestração da validação de uma execução: leitura alinhada, métricas, linhas de base, curva de captura, sub-bacias e registro. |
+| `compat.py` | Diferenças entre o QGIS 3 (Qt5) e o QGIS 4 (Qt6): nomes de enum com escopo, tipos de geometria e de campo. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
 | `tools/` | Geração de interfaces, empacotamento e dados de teste. |
 | `tests/` | Testes do núcleo e contratos de interface. |
@@ -387,7 +388,7 @@ Os caminhos do núcleo são relativos à pasta `risco_garimpo/`. As responsabili
 
 Cada ferramenta organiza o trabalho em três fases: **preparar**, na thread principal, acessa as camadas do projeto; **executar**, em segundo plano, realiza os cálculos; **agregar/escrever**, na thread principal, finaliza as saídas.
 
-A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu e roda também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais; fora desse ambiente, esse teste é pulado.
+A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu, e um terceiro o QGIS 4.2 do conda-forge; os dois rodam também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais e abre o plugin e os três diálogos; fora desses ambientes, esse teste é pulado.
 
 O arquivo `tests/test_contrato_ui.py` verifica os componentes utilizados pelos diálogos e a correspondência entre os arquivos de interface e seus geradores.
 

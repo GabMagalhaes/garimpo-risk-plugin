@@ -3,11 +3,11 @@
 
 import os
 
-from qgis.core import (Qgis, QgsApplication, QgsProject, QgsVectorLayer,
-                       QgsWkbTypes)
+from qgis.core import QgsApplication, QgsProject, QgsVectorLayer
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog, QMessageBox
 
+from .. import compat
 from ..core import registro as _registro
 from ..core.execucao_validacao import (ConfiguracaoValidacao,
                                        avisos_de_honestidade,
@@ -58,7 +58,7 @@ class ValidacaoDialog(QDialog, FORM_CLASS):
     def recarregar(self):
         poligonos = [c for c in QgsProject.instance().mapLayers().values()
                      if isinstance(c, QgsVectorLayer)
-                     and c.geometryType() == QgsWkbTypes.PolygonGeometry]
+                     and c.geometryType() == compat.tipo_geometria("Polygon")]
         poligonos.sort(key=lambda c: c.name().lower())
         anterior = self.comboSubbacias.currentData()
         self.comboSubbacias.blockSignals(True)
@@ -238,8 +238,8 @@ class ValidacaoDialog(QDialog, FORM_CLASS):
         self._registrar("Concluído. Resultados em %s" % config.pasta_saida)
         self._restaurar("Pronto.")
         self.iface.messageBar().pushMessage(
-            "Risco Garimpo", "Validação concluída.", level=Qgis.Success,
-            duration=6)
+            "Risco Garimpo", "Validação concluída.",
+            level=compat.nivel_sucesso(), duration=6)
 
     def _falhar(self):
         if self.tarefa is not None and self.tarefa.excecao is not None:

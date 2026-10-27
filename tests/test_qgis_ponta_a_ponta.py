@@ -26,6 +26,16 @@ else:
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _ambiente_do_subprocesso():
+    """Ambiente de um processo filho: a raiz do repositório no PYTHONPATH,
+    sem perder o caminho do qgis que o ambiente já traga ali (OSGeo4W,
+    conda)."""
+    caminhos = [RAIZ] + [p for p in os.environ.get("PYTHONPATH", "")
+                         .split(os.pathsep) if p]
+    return dict(os.environ, PYTHONPATH=os.pathsep.join(caminhos),
+                QT_QPA_PLATFORM="offscreen")
+
+
 @pytest.fixture(scope="module")
 def qgis():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -137,7 +147,7 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
                 % (dados["K"], dados["mu0"], dados["K"], dados["mascara"],
                    dados["eventos"] + "|layername=alertas",
                    dados["eventos"] + "|layername=autos", saida))
-    ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
+    ambiente = _ambiente_do_subprocesso()
     processo = subprocess.run(
         [sys.executable, str(pasta / "calibrar_paralelo.py"), "2",
          "calibrar_periodo.py"],
@@ -160,7 +170,7 @@ def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
     """O diálogo de verdade, com Qt e QgsTask, em processo próprio."""
     import subprocess
 
-    ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
+    ambiente = _ambiente_do_subprocesso()
     processo = subprocess.run(
         [sys.executable, os.path.join(RAIZ, "tests",
                                       "roteiro_dialogo_validacao.py"),
@@ -168,3 +178,41 @@ def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
         env=ambiente, capture_output=True, text=True, timeout=600)
     saida = processo.stdout + processo.stderr
     assert processo.returncode == 0 and "DIALOGO_OK" in processo.stdout, saida
+
+
+def test_plugin_e_dialogos_dos_modelos_num_qgis_com_interface(tmp_path):
+    """Menu, diálogos do estático e do dinâmico, preferências e fechamento."""
+    import subprocess
+
+    ambiente = _ambiente_do_subprocesso()
+    # preferências (QgsSettings) num perfil descartável, não no do usuário
+    ambiente.update(QGIS_CUSTOM_CONFIG_PATH=str(tmp_path / "perfil"),
+                    XDG_CONFIG_HOME=str(tmp_path / "config"))
+    processo = subprocess.run(
+        [sys.executable, os.path.join(RAIZ, "tests", "roteiro_dialogos.py"),
+         str(tmp_path)],
+        env=ambiente, capture_output=True, text=True, timeout=600)
+    saida = processo.stdout + processo.stderr
+    assert processo.returncode == 0 and "DIALOGOS_OK" in processo.stdout, saida
+
+
+def test_o_qgis_instalado_aceita_e_encontra_o_plugin(qgis, tmp_path):
+    """O verificador de versões do próprio QGIS, e a leitura do metadata.txt."""
+    import shutil
+
+    pasta = os.path.join(qgis_core.QgsApplication.pkgDataPath(), "python")
+    if pasta not in sys.path:
+        sys.path.append(pasta)          # pyplugin_installer, no Ubuntu
+    from pyplugin_installer.version_compare import isCompatible, pyQgisVersion
+    from qgis import utils
+
+    shutil.copytree(os.path.join(RAIZ, "risco_garimpo"),
+                    str(tmp_path / "risco_garimpo"),
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    encontrados = dict(utils.findPlugins(str(tmp_path)))
+    assert "risco_garimpo" in encontrados
+    metadados = encontrados["risco_garimpo"]
+    minimo = metadados.get("general", "qgisMinimumVersion")
+    maximo = metadados.get("general", "qgisMaximumVersion")
+    assert isCompatible(pyQgisVersion(), minimo, maximo), (pyQgisVersion(),
+                                                           minimo, maximo)

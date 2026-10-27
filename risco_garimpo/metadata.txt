@@ -1,8 +1,11 @@
 [general]
 name=Risco Garimpo
 qgisMinimumVersion=3.22
+# sem o máximo, o QGIS assume 3.99 e recusa o plugin no QGIS 4
+qgisMaximumVersion=4.99
+supportsQt6=True
 description=Duas ferramentas: o modelo estático, que estima K — a proporção da área que se espera explorada no máximo —, e o modelo dinâmico, que simula a expansão do garimpo ilegal consumindo esse K.
-version=0.3.3
+version=0.3.4
 author=Gabriel Campos Magalhães (PPGEDAM/NUMA/UFPA)
 email=gabriel.campos.magalhaes@gmail.com
 
@@ -18,7 +21,8 @@ experimental=True
 deprecated=False
 
 hasProcessingProvider=no
-changelog=0.3.3 - Ferramenta Validar uma execução no menu Raster → Risco Garimpo.
+changelog=0.3.4 - Compatível com o QGIS 4 (Qt6), sem deixar o QGIS 3.22 ou posterior; testado no QGIS 4.2.3 e no 3.34. A ferramenta Validar compara também com a proximidade em 100 e 150 m.
+    0.3.3 - Ferramenta Validar uma execução no menu Raster → Risco Garimpo.
     0.3.2 - Validação de uma execução contra o garimpo observado (métricas, linhas de base, curva de captura, sub-bacias e registro), a partir do registro da execução.
     0.3.1 - Registro de execução em JSON ao lado das saídas (configuração, parâmetros, insumos com SHA-256, saídas). Correção: o GeoPackage por sub-bacia do modelo estático falhava ao gravar.
     0.3.0 - Potencial Aurífero Remanescente (K - mu) por pixel e somado por sub-bacia, com grau de explotacao, excedente, variacao no ultimo ano e projecao de esgotamento.

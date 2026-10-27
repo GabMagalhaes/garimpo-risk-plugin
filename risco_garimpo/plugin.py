@@ -11,7 +11,11 @@ import os
 
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+
+try:  # Qt6 (QGIS 4): QAction passou para QtGui
+    from qgis.PyQt.QtGui import QAction
+except ImportError:  # Qt5 (QGIS 3)
+    from qgis.PyQt.QtWidgets import QAction
 
 PLUGIN_DIR = os.path.dirname(__file__)
 MENU_TITLE = "Risco Garimpo"

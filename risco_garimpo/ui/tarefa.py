@@ -6,6 +6,8 @@ import traceback
 from qgis.core import QgsTask
 from qgis.PyQt.QtCore import pyqtSignal
 
+from .. import compat
+
 from ..core.execucao import executar
 from ..core.model import SimulacaoCancelada
 
@@ -18,7 +20,7 @@ class TarefaSimulacao(QgsTask):
 
     def __init__(self, config, preparo):
         super().__init__("Modelo dinâmico de risco de garimpo",
-                         QgsTask.CanCancel)
+                         compat.tarefa_cancelavel())
         self.config = config
         self.preparo = preparo
         self.saida = None

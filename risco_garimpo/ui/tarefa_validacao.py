@@ -6,6 +6,8 @@ import traceback
 from qgis.core import QgsTask
 from qgis.PyQt.QtCore import pyqtSignal
 
+from .. import compat
+
 from ..core.execucao_validacao import ValidacaoCancelada, executar
 
 
@@ -15,7 +17,8 @@ class TarefaValidacao(QgsTask):
     registro = pyqtSignal(str)
 
     def __init__(self, preparado):
-        super().__init__("Validação de uma execução", QgsTask.CanCancel)
+        super().__init__("Validação de uma execução",
+                         compat.tarefa_cancelavel())
         self.preparado = preparado
         self.saida = None
         self.excecao = None
