@@ -46,7 +46,7 @@ Se houver falha, consulte o registro de execução. Nos dados reais, confira ini
 | Campo | Conteúdo | Origem |
 |---|---|---|
 | `K` | Raster de capacidade de ocupação. O modelo estático produz valores entre 0 e 1. | Saída do modelo estático ou raster externo fornecido pelo usuário [P1]. |
-| `μ₀` | Raster da ocupação por garimpo na data inicial, na mesma unidade de `K`. | Mapeamento histórico selecionado pelo usuário; o capítulo de metodologia utiliza a série MapBiomas [P2]. |
+| Mapa de garimpo (0/1) — data inicial | Mapa anual do garimpo na data inicial, sem suavizar: 1 = garimpo, 0 = não. Na grade de trabalho vira `μ₀`, a fração ocupada de cada pixel. | Mapeamento histórico selecionado pelo usuário; o capítulo de metodologia utiliza a série MapBiomas [P2]. |
 | Máscara | Raster opcional cujos valores maiores que zero delimitam a área simulada. | Recorte territorial definido pelo usuário [P1]. |
 | Grade de trabalho | Sistema de referência, extensão e resolução da simulação. Deve utilizar coordenadas projetadas em metros. | Configuração da execução [P1]. |
 | Alertas | Camada de pontos ou polígonos e respectivo campo de data. | Camada selecionada; na pesquisa, alertas Brasil Mais, com dados SCCON/Planet [P2]. |
@@ -138,7 +138,9 @@ Para cada classe de favorabilidade, calcula-se um quantil alto da ocupação loc
 | Símbolo | Significado | Unidade ou intervalo | Fonte |
 |---|---|---|---|
 | `K(x)` | Capacidade de ocupação por garimpo estimada para o pixel `x`. | Fração da área do pixel, entre 0 e 1, na saída do modelo estático. | Calibração do projeto [P1]. |
-| `μ(x)`, mu | Ocupação observada por garimpo, usada na calibração ou no diagnóstico estático. | Fração da área do pixel. | Mapeamento histórico [P1, P2]. |
+| `μ(x)`, mu | Ocupação observada por garimpo, usada na calibração ou no diagnóstico estático. A ferramenta a calcula a partir do **mapa de garimpo (0/1)** do ano de referência; o nível usa a média de `μ` na janela de ocupação. | Fração da área do pixel. | Mapeamento histórico [P1, P2]. |
+
+Os três insumos de ocupação da ferramenta — **mapa de garimpo (0/1)** do ano de referência, do ano mais antigo e do ano anterior — são os mapas anuais como vêm do MapBiomas (só a classe de garimpo), **sem suavizar**: a ferramenta calcula a vizinhança. Um mapa já suavizado seria suavizado de novo, e o nível de K sairia mais baixo e num suporte maior que a janela declarada. A ferramenta avisa quando o mapa tem muitos valores entre 0 e 1 na própria resolução.
 
 A ocupação observada participa da calibração da curva que converte o escore em capacidade. As evidências de terreno determinam a ordenação espacial. A avaliação deve usar períodos distintos para calibrar a curva e verificar seu desempenho.
 

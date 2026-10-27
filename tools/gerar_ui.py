@@ -169,12 +169,15 @@ def construir():
         grupo("grupoRasters", "Rasters de entrada",
               [campo("combo", "comboK",
                      "K — capacidade de suporte (favorabilidade estática)",
-                     "Raster do modelo estático. K exclui μ: o garimpo "
-                     "pretérito entra no estado e no contágio, nunca em K."),
+                     "Raster do modelo estático. K exclui o garimpo "
+                     "mapeado: ele entra no estado e no contágio, nunca em "
+                     "K."),
                campo("combo", "comboMu0",
-                     "μ₀ — estado inicial (garimpo existente)",
-                     "Fração ocupada por pixel na data inicial, na mesma "
-                     "unidade de K."),
+                     "Mapa de garimpo (0/1) — data inicial",
+                     "Como vem do mapa anual (ex.: MapBiomas, só a classe "
+                     "de garimpo): 1 = garimpo, 0 = não. Não suavize: na "
+                     "grade de trabalho ele vira μ₀, a fração ocupada de "
+                     "cada pixel, e o contágio faz a vizinhança."),
                campo("combo", "comboMascara",
                      "Máscara da área de estudo (opcional)",
                      "Valores > 0 delimitam a área simulada.")],

@@ -83,16 +83,16 @@
 </item>
 <item row="3" column="0">
 <widget class="QLabel" name="lbl_linhaMuInicial">
-<property name="text"><string>Garimpo na data inicial (μ₀)</string></property>
+<property name="text"><string>Mapa de garimpo (0/1) — data inicial</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>O mesmo μ₀ usado na execução, em fração 0–1.</string></property>
+<property name="toolTip"><string>O mesmo mapa usado na execução.</string></property>
 </widget>
 </item>
 <item row="3" column="1">
 <layout class="QHBoxLayout" name="layout_linhaMuInicial">
 <item>
 <widget class="QLineEdit" name="linhaMuInicial">
-<property name="toolTip"><string>O mesmo μ₀ usado na execução, em fração 0–1.</string></property>
+<property name="toolTip"><string>O mesmo mapa usado na execução.</string></property>
 </widget>
 </item>
 <item>
@@ -167,16 +167,16 @@
 <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
 <item row="0" column="0">
 <widget class="QLabel" name="lbl_linhaMuFinal">
-<property name="text"><string>Garimpo na data final</string></property>
+<property name="text"><string>Mapa de garimpo (0/1) — data final</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, em fração 0–1 (ex.: MapBiomas, só a classe de garimpo).</string></property>
+<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, como vem do mapa anual (ex.: MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não.</string></property>
 </widget>
 </item>
 <item row="0" column="1">
 <layout class="QHBoxLayout" name="layout_linhaMuFinal">
 <item>
 <widget class="QLineEdit" name="linhaMuFinal">
-<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, em fração 0–1 (ex.: MapBiomas, só a classe de garimpo).</string></property>
+<property name="toolTip"><string>Mapa que o modelo não viu, na data final da execução, como vem do mapa anual (ex.: MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não.</string></property>
 </widget>
 </item>
 <item>

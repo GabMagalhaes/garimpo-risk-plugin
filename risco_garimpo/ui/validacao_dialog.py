@@ -38,10 +38,11 @@ class ValidacaoDialog(QDialog, FORM_CLASS):
         for botao, linha, titulo in (
                 (self.btnPrevisto, self.linhaPrevisto, "Expansão prevista"),
                 (self.btnMuInicial, self.linhaMuInicial,
-                 "Garimpo na data inicial"),
+                 "Mapa de garimpo — data inicial"),
                 (self.btnK, self.linhaK, "K"),
                 (self.btnMascara, self.linhaMascara, "Máscara da simulação"),
-                (self.btnMuFinal, self.linhaMuFinal, "Garimpo na data final"),
+                (self.btnMuFinal, self.linhaMuFinal,
+                 "Mapa de garimpo — data final"),
                 (self.btnAvaliacao, self.linhaAvaliacao,
                  "Máscara de avaliação")):
             botao.clicked.connect(

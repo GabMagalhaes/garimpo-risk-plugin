@@ -21,8 +21,8 @@ import numpy as np
 
 from . import estatico
 from . import registro as _registro
-from .raster import (escrever_raster, grade_de_raster, grade_reamostrada,
-                     ler_alinhado)
+from .raster import (aviso_de_mapa, escrever_raster, grade_de_raster,
+                     grade_reamostrada, ler_alinhado)
 from .remanescente import agregar_potencial, remanescente, resumo_global
 
 
@@ -118,8 +118,8 @@ def preparar(config, registrar=None):
     if not config.caminho_ibx:
         raise ValueError("informe ao menos a camada de PGgeom/IBx")
     if not config.caminho_mu and config.estimar_nivel:
-        raise ValueError("estimar o nível exige a camada de garimpo "
-                         "observado (μ)")
+        raise ValueError("estimar o nível exige o mapa de garimpo (0/1) "
+                         "do ano de referência")
     if not config.pasta_saida:
         raise ValueError("escolha a pasta de saída")
 
@@ -217,6 +217,13 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
     if config.caminho_mu:
         mu = np.clip(ler_alinhado(config.caminho_mu, grade, "average"),
                      0.0, 1.0)
+    for caminho, ano in ((config.caminho_mu, "de referência"),
+                         (config.caminho_mu_antigo, "mais antigo"),
+                         (config.caminho_mu_anterior, "anterior")):
+        aviso = caminho and aviso_de_mapa(
+            caminho, "mapa de garimpo do ano %s" % ano)
+        if aviso:
+            log(aviso)
     passo(45)
 
     maduro = dentro.copy()

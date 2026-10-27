@@ -32,7 +32,7 @@ import numpy as np
 
 from . import registro as _registro
 from . import validacao as _v
-from .raster import grade_de_raster, ler_alinhado
+from .raster import aviso_de_mapa, grade_de_raster, ler_alinhado
 
 # a calibração com dados reais (150 m) teve o melhor resultado com contágio de
 # 100 m; a linha de base mais fina precisa estar à altura
@@ -229,6 +229,11 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
     passo(15)
     mu1 = _fracao(ler_alinhado(config.caminho_mu_final, grade, "media"),
                   "garimpo na data final")
+    for caminho, data in ((config.caminho_mu_inicial, "inicial"),
+                          (config.caminho_mu_final, "final")):
+        aviso = aviso_de_mapa(caminho, "mapa de garimpo da data %s" % data)
+        if aviso:
+            log(aviso)
     passo(30)
     K = None
     if config.caminho_k:

@@ -98,7 +98,7 @@ def test_preparar_exige_mu_para_estimar_nivel():
                                pasta_saida="/s", estimar_nivel=True)
     with pytest.raises(ValueError) as erro:
         preparar(cfg)
-    assert "μ" in str(erro.value)
+    assert "mapa de garimpo" in str(erro.value)
 
 
 def test_preparar_so_conta_as_variaveis_informadas(monkeypatch):

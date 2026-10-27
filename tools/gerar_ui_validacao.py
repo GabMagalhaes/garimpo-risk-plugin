@@ -35,8 +35,9 @@ def construir():
                _arquivo("linhaPrevisto", "Expansão prevista (Δμ)",
                         "O <prefixo>_expansao_<data>.tif da execução. A "
                         "grade dele é a grade da validação."),
-               _arquivo("linhaMuInicial", "Garimpo na data inicial (μ₀)",
-                        "O mesmo μ₀ usado na execução, em fração 0–1."),
+               _arquivo("linhaMuInicial",
+                        "Mapa de garimpo (0/1) — data inicial",
+                        "O mesmo mapa usado na execução."),
                _arquivo("linhaK", "K",
                         "Habilita as linhas de base que usam o potencial "
                         "(só K, remanescente, proximidade × remanescente)."),
@@ -47,10 +48,11 @@ def construir():
                    "observado na data final. Sem ele, informe os arquivos à "
                    "mão. K e a máscara são opcionais."),
         grupo("grupoObservado", "Garimpo observado",
-              [_arquivo("linhaMuFinal", "Garimpo na data final",
+              [_arquivo("linhaMuFinal",
+                        "Mapa de garimpo (0/1) — data final",
                         "Mapa que o modelo não viu, na data final da "
-                        "execução, em fração 0–1 (ex.: MapBiomas, só a "
-                        "classe de garimpo)."),
+                        "execução, como vem do mapa anual (ex.: MapBiomas, "
+                        "só a classe de garimpo): 1 = garimpo, 0 = não."),
                _arquivo("linhaAvaliacao", "Máscara de avaliação",
                         "Onde as métricas são medidas, se for menor que a "
                         "área simulada (ex.: a área de estudo, simulada com "

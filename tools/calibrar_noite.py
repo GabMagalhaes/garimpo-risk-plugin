@@ -68,8 +68,8 @@ import numpy as np
 CONFIG = dict(
     # capacidade de suporte (saída do modelo estático, ex.: PMT_K.tif)
     K=r"C:\Users\<voce>\dados\PMT_K.tif",
-    # garimpo na data inicial e na data final, em fração 0–1 (1 = garimpo);
-    # ex.: MapBiomas Mineração de dois anos, só a classe de garimpo
+    # mapas de garimpo (0/1) das duas datas, como vêm do mapa anual (ex.:
+    # MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não, sem suavizar
     MU_INICIAL=r"C:\Users\<voce>\dados\garimpo_2022.tif",
     MU_FINAL=r"C:\Users\<voce>\dados\garimpo_2024.tif",
     # onde a dinâmica roda: a área de estudo + uma faixa em volta (ex.: 5 km),
