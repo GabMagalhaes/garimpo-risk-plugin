@@ -5,7 +5,7 @@ qgisMinimumVersion=3.22
 qgisMaximumVersion=4.99
 supportsQt6=True
 description=Duas ferramentas: o modelo estático, que estima K — a proporção da área que se espera explorada no máximo —, e o modelo dinâmico, que simula a expansão do garimpo ilegal consumindo esse K.
-version=0.3.6
+version=0.3.7
 author=Gabriel Campos Magalhães (PPGEDAM/NUMA/UFPA)
 email=gabriel.campos.magalhaes@gmail.com
 
@@ -21,7 +21,8 @@ experimental=True
 deprecated=False
 
 hasProcessingProvider=no
-changelog=0.3.6 - Correção: a maturidade (exposição longa) marcava como madura cerca de metade da área, por ruído numérico da convolução; agora é madura só a janela com garimpo do mapa antigo (ao menos meio pixel). Muda o nível de todo K gerado com o mapa do ano mais antigo.
+changelog=0.3.7 - Estratos (água e terra) no relatório: uma tabela de saturação por estrato e, no registro, a área, a área madura, se o estrato teve curva própria ou ficou com a geral (e por quê) e o teto. Antes, o estrato sem dados ficava com a curva geral em silêncio. K não muda.
+    0.3.6 - Correção: a maturidade (exposição longa) marcava como madura cerca de metade da área, por ruído numérico da convolução; agora é madura só a janela com garimpo do mapa antigo (ao menos meio pixel). Muda o nível de todo K gerado com o mapa do ano mais antigo.
     0.3.5 - Os insumos de ocupação passam a se chamar mapa de garimpo (0/1): o mapa anual, sem suavizar, do qual a ferramenta calcula μ. Aviso quando o mapa tem muitos valores entre 0 e 1 na própria resolução, sinal de mapa suavizado.
     0.3.4 - Compatível com o QGIS 4 (Qt6), sem deixar o QGIS 3.22 ou posterior; testado no QGIS 4.2.3 e no 3.34. A ferramenta Validar compara também com a proximidade em 100 e 150 m.
     0.3.3 - Ferramenta Validar uma execução no menu Raster → Risco Garimpo.

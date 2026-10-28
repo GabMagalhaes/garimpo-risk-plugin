@@ -76,6 +76,10 @@ class ConfiguracaoEstatica(object):
         self.carregar = carregar
 
 
+# rótulos dos estratos quando há máscara de água (ver executar)
+ESTRATOS = ("agua", "terra")
+
+
 def caminho_de_saida(config, nome, extensao="tif"):
     return os.path.join(config.pasta_saida,
                         "%s_%s.%s" % (config.prefixo, nome, extensao))
@@ -95,6 +99,10 @@ def caminhos_de_saida(config):
         caminhos.append(caminho_de_saida(config, "remanescente"))
     if config.estimar_nivel and config.salvar_tabela:
         caminhos.append(caminho_de_saida(config, "saturacao", "csv"))
+        if config.caminho_agua:
+            caminhos.extend(caminho_de_saida(config, "saturacao_" + rotulo,
+                                             "csv")
+                            for rotulo in ESTRATOS)
     if config.camada_subbacias is not None:
         caminhos.append(caminho_de_saida(config, "subbacias", "gpkg"))
     return caminhos
@@ -240,7 +248,7 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
     if config.caminho_agua:
         agua = ler_alinhado(config.caminho_agua, grade, "near")
         e_agua = dentro & np.isfinite(agua) & (agua > 0)
-        estratos = {"agua": e_agua, "terra": dentro & ~e_agua}
+        estratos = dict(zip(ESTRATOS, (e_agua, dentro & ~e_agua)))
         log("estrato água: %.2f%% da área válida"
             % (100.0 * e_agua.sum() / max(dentro.sum(), 1)))
     passo(60)
@@ -259,6 +267,14 @@ def executar(preparado, progresso=None, cancelado=None, registrar=None):
         if fracao > 0:
             log("veto: %s zeraria %.1f%% da grade sem o piso"
                 % (nome, 100.0 * fracao))
+    km2 = grade.pixel_m ** 2 / 1e6
+    for rotulo, nivel in resultado.por_estrato.items():
+        if nivel.curva is not None:
+            log("estrato %s: curva própria, %.0f km² maduros, teto %.4f"
+                % (rotulo, nivel.maduros * km2, nivel.curva[1][-1]))
+        else:
+            log("AVISO: o estrato %s ficou com a curva geral (%s)"
+                % (rotulo, nivel.motivo))
 
     resultado.K = np.where(dentro, resultado.K, 0.0).astype(np.float32)
     resultado.escore = np.where(dentro, resultado.escore,
@@ -352,21 +368,24 @@ def escrever(calculado, registrar=None):
     if config.estimar_nivel and config.salvar_tabela \
             and resultado.saturacao is not None:
         caminho = caminho_de_saida(config, "saturacao", "csv")
-        x, y = resultado.curva
-        with open(caminho, "w", encoding="utf-8") as arquivo:
-            arquivo.write("escore;n_pixels;saturacao_observada;nivel_ajustado\n")
-            for centro, sat, cont in zip(resultado.centros,
-                                         resultado.saturacao,
-                                         resultado.contagem):
-                ajustado = float(np.interp(centro, x, y, left=y[0],
-                                           right=y[-1]))
-                arquivo.write("%.6f;%d;%s;%.6f\n"
-                              % (centro, int(cont),
-                                 "" if not np.isfinite(sat) else "%.6f" % sat,
-                                 ajustado))
+        _gravar_saturacao(caminho, resultado.centros, resultado.saturacao,
+                          resultado.contagem, resultado.curva)
         gravados.append(caminho)
         saidas["saturacao"] = caminho
         log("gravado: %s" % caminho)
+        # uma tabela por estrato, com o nível que ele recebeu de fato (a
+        # curva própria ou, sem ela, a geral)
+        for rotulo, nivel in resultado.por_estrato.items():
+            nome = "saturacao_" + rotulo
+            caminho = caminho_de_saida(config, nome, "csv")
+            if nivel.centros is None:
+                _apagar(caminho)        # não deixar a de outra execução
+                continue
+            _gravar_saturacao(caminho, nivel.centros, nivel.saturacao,
+                              nivel.contagem, nivel.curva or resultado.curva)
+            gravados.append(caminho)
+            saidas[nome] = caminho
+            log("gravado: %s" % caminho)
 
     n_subbacias = None
     if config.camada_subbacias is not None:
@@ -393,6 +412,26 @@ def escrever(calculado, registrar=None):
     return gravados
 
 
+def _gravar_saturacao(caminho, centros, saturacao, contagem, curva):
+    """Tabela das faixas de escore: observado e nível ajustado."""
+    x, y = curva
+    with open(caminho, "w", encoding="utf-8") as arquivo:
+        arquivo.write("escore;n_pixels;saturacao_observada;nivel_ajustado\n")
+        for centro, sat, cont in zip(centros, saturacao, contagem):
+            ajustado = float(np.interp(centro, x, y, left=y[0], right=y[-1]))
+            arquivo.write("%.6f;%d;%s;%.6f\n"
+                          % (centro, int(cont),
+                             "" if not np.isfinite(sat) else "%.6f" % sat,
+                             ajustado))
+
+
+def _apagar(caminho):
+    try:
+        os.remove(caminho)
+    except OSError:
+        pass
+
+
 def _registrar(calculado, saidas, n_subbacias, log):
     """Grava o registro. Uma falha aqui não desfaz as saídas já gravadas."""
     config = calculado["config"]
@@ -409,6 +448,17 @@ def _registrar(calculado, saidas, n_subbacias, log):
         }
         if n_subbacias is not None:
             resultados["subbacias"] = n_subbacias
+        if resultado.por_estrato:
+            km2 = calculado["grade"].pixel_m ** 2 / 1e6
+            resultados["estratos"] = {
+                rotulo: {"area_km2": nivel.pixels * km2,
+                         "maduros_km2": nivel.maduros * km2,
+                         "curva": ("propria" if nivel.curva is not None
+                                   else "geral"),
+                         "motivo": nivel.motivo,
+                         "teto": (float(nivel.curva[1][-1])
+                                  if nivel.curva is not None else None)}
+                for rotulo, nivel in resultado.por_estrato.items()}
         dados = _registro.montar(
             "modelo_estatico", _registro.configuracao_simples(config),
             calculado["grade"], calculado.get("insumos", []), saidas,

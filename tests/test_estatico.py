@@ -314,3 +314,24 @@ def test_estratos_recebem_niveis_proprios():
                 estratos={"agua": agua, "terra": ~agua})
     assert set(r.por_estrato) == {"agua", "terra"}
     assert r.K[agua].max() > r.K[~agua].max()
+    assert all(n.curva is not None and n.motivo is None
+               for n in r.por_estrato.values())
+
+
+def test_estrato_com_poucos_maduros_diz_por_que_ficou_com_a_geral():
+    rng = np.random.default_rng(6)
+    forma = (200, 200)
+    ibx = rng.random(forma).astype(np.float32)
+    mu = (rng.random(forma) < 0.3 * ibx).astype(np.float32)
+    agua = np.zeros(forma, bool)
+    agua[:5, :5] = True                   # 25 pixels: faixas sem amostra
+    r = gerar_k([ibx], ["IBx"], [1.0], 0.4, mu, pixel_m=30.0,
+                maduro=np.ones(forma, bool), n_faixas=20,
+                minimo_por_faixa=100,
+                estratos={"agua": agua, "terra": ~agua})
+    nivel = r.por_estrato["agua"]
+    assert nivel.curva is None and "insuficientes" in nivel.motivo
+    assert nivel.pixels == 25 and nivel.maduros == 25
+    assert nivel.centros is not None      # o observado fica para a tabela
+    np.testing.assert_allclose(r.K[agua],
+                               aplicar_nivel(r.escore[agua], *r.curva))

@@ -260,3 +260,95 @@ def test_maturidade_e_so_onde_o_mapa_antigo_tem_garimpo(monkeypatch):
     # janela de 13 × 13 pixels a 30 m: o bloco vira (7 + 12)² = 361 pixels,
     # 0,4% da grade de 90.000
     assert "0.4%" in linha, linha
+
+
+# ------------------------------------------------- relatório dos estratos
+def _com_agua(monkeypatch, mod, antigo_so_na_terra=False):
+    grade = _GradeFalsa(nx=200, ny=200)
+    rng = np.random.default_rng(4)
+    pggeom = rng.random(grade.shape).astype(np.float32)
+    agua = np.zeros(grade.shape, dtype=np.float32)
+    agua[:60, :] = 1.0
+    mu = np.where(agua > 0,
+                  rng.random(grade.shape) < 0.9 * pggeom,
+                  rng.random(grade.shape) < 0.15 * pggeom).astype(np.float32)
+    leituras = {"/dados/pggeom.tif": pggeom, "/dados/mu.tif": mu,
+                "/dados/agua.tif": agua}
+    extra = {}
+    if antigo_so_na_terra:
+        # garimpo antigo longe do leito: nenhum pixel maduro na água
+        antigo = np.zeros(grade.shape, dtype=np.float32)
+        antigo[120:, :] = mu[120:, :]
+        leituras["/dados/antigo.tif"] = antigo
+        extra["caminho_mu_antigo"] = "/dados/antigo.tif"
+    _aparelhar(monkeypatch, mod, grade, leituras)
+    monkeypatch.setattr(mod, "escrever_raster",
+                        lambda caminho, *a, **k: open(caminho, "w").close())
+    return extra
+
+
+def test_cada_estrato_ganha_tabela_e_entra_no_registro(monkeypatch, tmp_path):
+    import json
+    import risco_garimpo.core.execucao_estatica as mod
+    extra = _com_agua(monkeypatch, mod)
+    cfg = _config(caminho_agua="/dados/agua.tif", n_faixas=20,
+                  minimo_por_faixa=100, pasta_saida=str(tmp_path), **extra)
+    mensagens = []
+    calculado = executar(preparar(cfg), registrar=mensagens.append)
+    gravados = mod.escrever(calculado, registrar=mensagens.append)
+
+    previstos = {os.path.basename(c) for c in caminhos_de_saida(cfg)}
+    for rotulo in ("agua", "terra"):
+        nome = "PMT_saturacao_%s.csv" % rotulo
+        assert nome in previstos
+        caminho = str(tmp_path / nome)
+        assert caminho in gravados
+        linhas = open(caminho, encoding="utf-8").read().splitlines()
+        assert linhas[0] == "escore;n_pixels;saturacao_observada;nivel_ajustado"
+        assert len(linhas) == 21
+        assert any(m.startswith("estrato %s: curva própria" % rotulo)
+                   for m in mensagens), mensagens
+
+    registro = json.load(open(str(tmp_path / "PMT_registro.json"),
+                              encoding="utf-8"))
+    estratos = registro["resultados"]["estratos"]
+    assert set(estratos) == {"agua", "terra"}
+    for info in estratos.values():
+        assert info["curva"] == "propria" and info["motivo"] is None
+        assert 0.0 < info["teto"] <= 1.0
+    # 200 × 200 pixels de 30 m = 36 km², repartidos entre os estratos
+    assert sum(i["area_km2"] for i in estratos.values()) == pytest.approx(36.0)
+    assert estratos["agua"]["teto"] > estratos["terra"]["teto"]
+
+
+def test_estrato_sem_maduro_fica_com_a_curva_geral_e_avisa(monkeypatch,
+                                                            tmp_path):
+    import json
+    import risco_garimpo.core.execucao_estatica as mod
+    extra = _com_agua(monkeypatch, mod, antigo_so_na_terra=True)
+    velho = tmp_path / "PMT_saturacao_agua.csv"
+    velho.write_text("de outra execução", encoding="utf-8")
+    cfg = _config(caminho_agua="/dados/agua.tif", n_faixas=20,
+                  minimo_por_faixa=100, pasta_saida=str(tmp_path), **extra)
+    mensagens = []
+    calculado = executar(preparar(cfg), registrar=mensagens.append)
+    mod.escrever(calculado, registrar=mensagens.append)
+
+    resultado = calculado["resultado"]
+    agua = resultado.por_estrato["agua"]
+    assert agua.curva is None and "nenhum pixel maduro" in agua.motivo
+    assert any(m.startswith("AVISO: o estrato agua ficou com a curva geral")
+               for m in mensagens), mensagens
+    # o leito recebeu o nível da curva geral
+    from risco_garimpo.core.estatico import aplicar_nivel
+    leito = np.zeros(resultado.K.shape, dtype=bool)
+    leito[:60, :] = True
+    np.testing.assert_allclose(
+        resultado.K[leito], aplicar_nivel(resultado.escore[leito],
+                                          *resultado.curva))
+    assert not velho.exists()            # a tabela antiga não fica
+    registro = json.load(open(str(tmp_path / "PMT_registro.json"),
+                              encoding="utf-8"))
+    info = registro["resultados"]["estratos"]["agua"]
+    assert info["curva"] == "geral" and info["teto"] is None
+    assert info["maduros_km2"] == 0.0
