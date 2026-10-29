@@ -68,8 +68,8 @@ import numpy as np
 CONFIG = dict(
     # capacidade de suporte (saída do modelo estático, ex.: PMT_K.tif)
     K=r"C:\Users\<voce>\dados\PMT_K.tif",
-    # garimpo na data inicial e na data final, em fração 0–1 (1 = garimpo);
-    # ex.: MapBiomas Mineração de dois anos, só a classe de garimpo
+    # mapas de garimpo (0/1) das duas datas, como vêm do mapa anual (ex.:
+    # MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não, sem suavizar
     MU_INICIAL=r"C:\Users\<voce>\dados\garimpo_2022.tif",
     MU_FINAL=r"C:\Users\<voce>\dados\garimpo_2024.tif",
     # onde a dinâmica roda: a área de estudo + uma faixa em volta (ex.: 5 km),
@@ -100,9 +100,19 @@ CONFIG = dict(
     # etapa "estrutura": saturação por K mais frouxa (K × fator) e escalas de
     # contágio menores, nos dois modos. Exige PASTA_SAIDA nova (coluna k_fator)
     ESTRUTURA=False,
+    # combinações escolhidas em OUTRO período, rodadas tal como vieram (com o
+    # r0 delas, sem recalibrar), nos dois modos: o teste honesto de uma
+    # escolha. Ex.: [{"r0": 0.0007, "escala_contagio_m": 100.0,
+    # "k_fator": 1.5}]. As chaves são as de Parametros, mais k_fator
+    CONFIGURACOES_EXTRAS=[],
 )
 
-# faixas exploradas (edite à vontade; o padrão do plugin está em Parametros)
+# faixas exploradas (edite à vontade)
+# base dos planos: os padrões do plugin até a 0.3.7 (r0 0,004, contágio
+# 380 m). Ficam fixos aqui para que os planos — e os ids das simulações —
+# não mudem com os padrões calibrados da 0.4.0 (0,0007 e 100 m): as rodadas
+# já feitas continuam retomáveis e comparáveis
+BASE_PLANO = dict(r0=0.004, escala_contagio_m=380.0)
 # 1º calibra-se r0 para a área nova prevista bater com a observada; as etapas
 # seguintes usam esse r0 — senão, com tudo subestimado, o critério premiaria
 # a fiscalização mais fraca só por deixar crescer mais
@@ -111,7 +121,10 @@ CONFIG = dict(
 R0 = [0.0001, 0.00015, 0.0002, 0.0003, 0.0004, 0.0005, 0.0007, 0.001, 0.002]
 # escalas de proximidade das linhas de base (m): o modelo é comparado com a
 # melhor delas, não só com a de 380 m
-ESCALAS_BASE_M = [200.0, 250.0, 300.0, 380.0, 500.0]
+# v2 (2020→2022): o melhor modelo usou contágio de 100 m; a comparação justa
+# pede a proximidade também em 100 e 150 m. Escalas novas só acrescentam
+# linhas de base: os ids das simulações não mudam
+ESCALAS_BASE_M = [100.0, 150.0, 200.0, 250.0, 300.0, 380.0, 500.0]
 SENSIBILIDADE = {
     "alerta_peso": [0.0, 0.5, 2.0, 4.0],
     "alerta_semeia": [False],
@@ -151,6 +164,11 @@ COLUNAS = ["id", "etapa", "modo", "r0", "alerta_peso", "alerta_escala_m",
 PARAMETROS_CSV = COLUNAS[3:14]
 
 _CONTEXTO = {}
+
+
+def parametros_base(model):
+    """Parâmetros da base dos planos (BASE_PLANO), não os padrões do plugin."""
+    return model.Parametros(**BASE_PLANO)
 
 
 # =========================================================================
@@ -433,11 +451,11 @@ def verificar():
     _CONTEXTO.update(ctx)
 
     _linhas_de_base(ctx)
-    padrao = model.Parametros()
+    padrao = parametros_base(model)
     plano = (_plano_inicial(padrao)
              + _plano_restante(padrao, r0_calibrado(padrao.r0)))
     feitos = _ids_feitos()
-    _log("simulação de teste com os parâmetros padrão do plugin…")
+    _log("simulação de teste com a base dos planos (padrão até a 0.3.7)…")
     linha = _rodar_uma(ctx, plano[0])
     if linha["erro"]:
         raise RuntimeError("a simulação de teste falhou:\n" + linha["erro"])
@@ -555,6 +573,15 @@ def _plano_restante(padrao, r0):
 
     item("calibrado", "reconstrucao")
     item("calibrado", "previsao")
+    padrao_base = {c: getattr(padrao, c) for c in PARAMETROS_CSV}
+    for extra in CONFIG.get("CONFIGURACOES_EXTRAS") or []:
+        mudancas = dict(extra)
+        if float(mudancas.get("k_fator", 1.0)) == 1.0:
+            mudancas.pop("k_fator", None)     # fator 1 = mesmo id de sempre
+        for modo in ("previsao", "reconstrucao"):
+            params = dict(padrao_base)        # o r0 vem da extra, não daqui
+            params.update(mudancas)
+            itens.append({"etapa": "extra", "modo": modo, "params": params})
     for nome, valores in SENSIBILIDADE.items():
         for valor in valores:
             item("sensibilidade", "reconstrucao", **{nome: valor})
@@ -728,7 +755,7 @@ def rodar_noite():
     if _CONTEXTO.get("assinatura") != _assinatura_config():
         verificar()
     ctx = _CONTEXTO
-    padrao = ctx["model"].Parametros()
+    padrao = parametros_base(ctx["model"])
     limite = time.time() + CONFIG["HORAS_MAXIMAS"] * 3600
     _log("=== rodar_noite(): para até %s ==="
          % _dt.datetime.fromtimestamp(limite).strftime("%d/%m %H:%M"))
@@ -862,7 +889,7 @@ def resumir(imprimir=True):
              "calibrado." % r0_calibrado())
     bases = [l for l in ok if l["etapa"] == "linha_de_base"]
     padrao = [l for l in ok if l["etapa"] in ("padrao", "calibrado")]
-    tabela("1) LINHAS DE BASE × MODELO (padrão do plugin e com r0 calibrado; "
+    tabela("1) LINHAS DE BASE × MODELO (padrão do plugin até a 0.3.7 e com r0 calibrado; "
            "o modelo precisa superar as linhas de base)", bases + padrao,
            "auc", n=20)
     for modo in ("reconstrucao", "previsao"):
@@ -918,6 +945,22 @@ def resumir(imprimir=True):
                             _mediana([l["captura_5"] for l in grupo]),
                             _mediana([l.get("perto_autos_auc", float("nan"))
                                       for l in grupo])))
+    extras = [l for l in sims if l["etapa"] == "extra"]
+    if extras:
+        escrever("")
+        escrever("7) CONFIGURAÇÕES EXTRAS (escolhidas fora deste período, rodadas "
+                 "como vieram) — compare com a melhor linha de base (AUC %.3f, "
+                 "cap5 %.3f)"
+                 % (max([b["auc"] for b in bases] or [float("nan")]),
+                    max([b["captura_5"] for b in bases] or [float("nan")])))
+        escrever("  %-12s %9s %7s %7s %7s %7s %7s"
+                 % ("modo", "r0", "k_fator", "escala", "AUC", "cap5", "área"))
+        for l in sorted(extras, key=lambda l: (l["modo"], l["r0"],
+                                               l["escala_contagio_m"])):
+            escrever("  %-12s %9.4g %7.4g %7.0f %7.3f %7.3f %7s"
+                     % (l["modo"], l["r0"], l["k_fator"],
+                        l["escala_contagio_m"], l["auc"], l["captura_5"],
+                        _f(l.get("razao_area"))))
     estrutura = [l for l in sims if l["etapa"] == "estrutura"
                  or _so_muda_a_escala(l, sims)]
     if any(l["etapa"] == "estrutura" for l in estrutura):

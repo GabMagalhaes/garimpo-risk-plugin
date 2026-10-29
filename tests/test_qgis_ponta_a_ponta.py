@@ -26,6 +26,16 @@ else:
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _ambiente_do_subprocesso():
+    """Ambiente de um processo filho: a raiz do repositório no PYTHONPATH,
+    sem perder o caminho do qgis que o ambiente já traga ali (OSGeo4W,
+    conda)."""
+    caminhos = [RAIZ] + [p for p in os.environ.get("PYTHONPATH", "")
+                         .split(os.pathsep) if p]
+    return dict(os.environ, PYTHONPATH=os.pathsep.join(caminhos),
+                QT_QPA_PLATFORM="offscreen")
+
+
 @pytest.fixture(scope="module")
 def qgis():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -120,21 +130,27 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
     dados = espaco["gerar"](str(tmp_path))
     pasta = tmp_path / "roteiros"
     pasta.mkdir()
-    for arquivo in ("calibrar_noite.py", "calibrar_paralelo.py"):
-        shutil.copy(os.path.join(RAIZ, "tools", arquivo), str(pasta))
+    # o CONFIG vai num arquivo com outro nome, passado como 3º argumento
+    shutil.copy(os.path.join(RAIZ, "tools", "calibrar_paralelo.py"),
+                str(pasta))
+    shutil.copy(os.path.join(RAIZ, "tools", "calibrar_noite.py"),
+                str(pasta / "calibrar_periodo.py"))
     saida = str(tmp_path / "saida")
-    with open(str(pasta / "calibrar_noite.py"), "a", encoding="utf-8") as f:
+    with open(str(pasta / "calibrar_periodo.py"), "a", encoding="utf-8") as f:
         f.write("\nCONFIG.update(K=%r, MU_INICIAL=%r, MU_FINAL=%r, MASCARA=%r,"
                 " MASCARA_AVALIACAO=None, ALERTAS=%r, CAMPO_DATA_ALERTAS='data',"
                 " AUTOS=%r, CAMPO_DATA_AUTOS='data', DATA_INICIAL='2025-01-01',"
                 " DATA_FINAL='2026-12-31', RESOLUCAO_M=200.0, PASTA_SAIDA=%r,"
-                " N_ALEATORIAS=3, ESTRUTURA=True, HORAS_MAXIMAS=1.0)\n"
+                " N_ALEATORIAS=3, ESTRUTURA=True, HORAS_MAXIMAS=1.0,"
+                " CONFIGURACOES_EXTRAS=[{'r0': 0.003,"
+                " 'escala_contagio_m': 150.0, 'k_fator': 1.5}])\n"
                 % (dados["K"], dados["mu0"], dados["K"], dados["mascara"],
                    dados["eventos"] + "|layername=alertas",
                    dados["eventos"] + "|layername=autos", saida))
-    ambiente = dict(os.environ, PYTHONPATH=RAIZ, QT_QPA_PLATFORM="offscreen")
+    ambiente = _ambiente_do_subprocesso()
     processo = subprocess.run(
-        [sys.executable, str(pasta / "calibrar_paralelo.py"), "2"],
+        [sys.executable, str(pasta / "calibrar_paralelo.py"), "2",
+         "calibrar_periodo.py"],
         env=ambiente, capture_output=True, text=True, timeout=600)
     assert processo.returncode == 0, processo.stdout + processo.stderr
 
@@ -143,7 +159,64 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
         linhas = list(csv.DictReader(f, delimiter=";"))
     etapas = {l["etapa"] for l in linhas}
     assert {"linha_de_base", "padrao", "r0", "calibrado", "fiscal",
-            "estrutura", "aleatoria"} <= etapas
+            "estrutura", "extra", "aleatoria"} <= etapas
+    assert "base_proximidade_100m" in {l["id"] for l in linhas}
     assert not [l for l in linhas if l["erro"]]
     assert any(l["k_fator"] == "100" for l in linhas)
     assert os.path.isfile(os.path.join(saida, "resumo.txt"))
+    # o log diz que QGIS e que plugin a rodada usou
+    from risco_garimpo.core import registro
+    log = open(os.path.join(saida, "calibracao.log"), encoding="utf-8").read()
+    assert "plugin Risco Garimpo %s em " % registro.versao_plugin() in log
+
+
+def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
+    """O diálogo de verdade, com Qt e QgsTask, em processo próprio."""
+    import subprocess
+
+    ambiente = _ambiente_do_subprocesso()
+    processo = subprocess.run(
+        [sys.executable, os.path.join(RAIZ, "tests",
+                                      "roteiro_dialogo_validacao.py"),
+         str(tmp_path)],
+        env=ambiente, capture_output=True, text=True, timeout=600)
+    saida = processo.stdout + processo.stderr
+    assert processo.returncode == 0 and "DIALOGO_OK" in processo.stdout, saida
+
+
+def test_plugin_e_dialogos_dos_modelos_num_qgis_com_interface(tmp_path):
+    """Menu, diálogos do estático e do dinâmico, preferências e fechamento."""
+    import subprocess
+
+    ambiente = _ambiente_do_subprocesso()
+    # preferências (QgsSettings) num perfil descartável, não no do usuário
+    ambiente.update(QGIS_CUSTOM_CONFIG_PATH=str(tmp_path / "perfil"),
+                    XDG_CONFIG_HOME=str(tmp_path / "config"))
+    processo = subprocess.run(
+        [sys.executable, os.path.join(RAIZ, "tests", "roteiro_dialogos.py"),
+         str(tmp_path)],
+        env=ambiente, capture_output=True, text=True, timeout=600)
+    saida = processo.stdout + processo.stderr
+    assert processo.returncode == 0 and "DIALOGOS_OK" in processo.stdout, saida
+
+
+def test_o_qgis_instalado_aceita_e_encontra_o_plugin(qgis, tmp_path):
+    """O verificador de versões do próprio QGIS, e a leitura do metadata.txt."""
+    import shutil
+
+    pasta = os.path.join(qgis_core.QgsApplication.pkgDataPath(), "python")
+    if pasta not in sys.path:
+        sys.path.append(pasta)          # pyplugin_installer, no Ubuntu
+    from pyplugin_installer.version_compare import isCompatible, pyQgisVersion
+    from qgis import utils
+
+    shutil.copytree(os.path.join(RAIZ, "risco_garimpo"),
+                    str(tmp_path / "risco_garimpo"),
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    encontrados = dict(utils.findPlugins(str(tmp_path)))
+    assert "risco_garimpo" in encontrados
+    metadados = encontrados["risco_garimpo"]
+    minimo = metadados.get("general", "qgisMinimumVersion")
+    maximo = metadados.get("general", "qgisMaximumVersion")
+    assert isCompatible(pyQgisVersion(), minimo, maximo), (pyQgisVersion(),
+                                                           minimo, maximo)

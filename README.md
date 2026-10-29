@@ -1,19 +1,20 @@
 # Risco Garimpo — plugin QGIS
 
-Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza duas ferramentas no menu **Raster → Risco Garimpo**:
+Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza três ferramentas no menu **Raster → Risco Garimpo**:
 
 | Ferramenta | Função | Produto principal |
 |---|---|---|
 | **Modelo estático — gerar K** | Estimar a capacidade de ocupação por garimpo a partir das condições do terreno e de uma calibração com dados observados. | Raster `K.tif`, com a fração máxima estimada de ocupação de cada pixel. |
 | **Modelo dinâmico de risco** | Simular a expansão no período escolhido, considerando ocupação inicial, contágio, alertas e fiscalização. | Raster de expansão `Δμ`, correspondente ao acréscimo de ocupação simulado. |
+| **Validar uma execução** | Comparar a expansão prevista por uma execução do modelo dinâmico com o garimpo novo observado, e com alternativas sem dinâmica. | Tabela de métricas, curva de captura e comparação por sub-bacia. |
 
-O modelo estático grava a capacidade estimada em arquivo. O modelo dinâmico recebe esse raster como insumo e o mantém fixo durante a simulação. Também pode receber um raster de capacidade produzido por outro procedimento, desde que compatível com a ocupação inicial.
+O modelo estático grava a capacidade estimada em arquivo. O modelo dinâmico recebe esse raster como insumo e o mantém fixo durante a simulação. Também pode receber um raster de capacidade produzido por outro procedimento, desde que compatível com a ocupação inicial. A validação lê o registro e as saídas de uma execução do modelo dinâmico.
 
 As equações abaixo descrevem a formulação documentada pelo projeto [P1]. As legendas informam o significado, a unidade e a origem dos símbolos. As referências dos métodos estão reunidas ao final.
 
 ## Instalação e teste inicial
 
-Requisito indicado pelo projeto: **QGIS 3.22 ou posterior**. NumPy e GDAL são utilizados no processamento. SciPy acelera a convolução e a transformada de distância; o projeto prevê alternativas em NumPy para ambientes sem SciPy.
+Requisito indicado pelo projeto: **QGIS 3.22 ou posterior, inclusive o QGIS 4** (Qt6); os testes rodam no QGIS 3.34 e no 4.2. NumPy e GDAL são utilizados no processamento. SciPy acelera a convolução e a transformada de distância; o projeto prevê alternativas em NumPy para ambientes sem SciPy.
 
 1. Na pasta do projeto, execute `python tools/empacotar.py`.
 2. No QGIS, abra **Complementos → Gerenciar e instalar complementos → Instalar a partir do ZIP** e selecione `dist/risco_garimpo-<versão>.zip`.
@@ -45,7 +46,7 @@ Se houver falha, consulte o registro de execução. Nos dados reais, confira ini
 | Campo | Conteúdo | Origem |
 |---|---|---|
 | `K` | Raster de capacidade de ocupação. O modelo estático produz valores entre 0 e 1. | Saída do modelo estático ou raster externo fornecido pelo usuário [P1]. |
-| `μ₀` | Raster da ocupação por garimpo na data inicial, na mesma unidade de `K`. | Mapeamento histórico selecionado pelo usuário; o capítulo de metodologia utiliza a série MapBiomas [P2]. |
+| Mapa de garimpo (0/1) — data inicial | Mapa anual do garimpo na data inicial, sem suavizar: 1 = garimpo, 0 = não. Na grade de trabalho vira `μ₀`, a fração ocupada de cada pixel. | Mapeamento histórico selecionado pelo usuário; o capítulo de metodologia utiliza a série MapBiomas [P2]. |
 | Máscara | Raster opcional cujos valores maiores que zero delimitam a área simulada. | Recorte territorial definido pelo usuário [P1]. |
 | Grade de trabalho | Sistema de referência, extensão e resolução da simulação. Deve utilizar coordenadas projetadas em metros. | Configuração da execução [P1]. |
 | Alertas | Camada de pontos ou polígonos e respectivo campo de data. | Camada selecionada; na pesquisa, alertas Brasil Mais, com dados SCCON/Planet [P2]. |
@@ -62,14 +63,24 @@ Confira o tamanho da **Grade resultante** e a memória estimada por camada antes
 
 | Parâmetro | Efeito no cálculo | Valor ou procedimento documentado | Fonte |
 |---|---|---|---|
-| Escala de contágio | Controla a distribuição espacial da influência da ocupação existente. | Aproximadamente 380 m. | Resultado da pesquisa citado em [P1] e [P2]. |
+| Escala de contágio | Controla a distribuição espacial da influência da ocupação existente. | 100 m (até a 0.3.7, 380 m). | Calibração 2020–2024 na APA do Tapajós; ver "Origem dos padrões" abaixo. A estimativa experimental anterior, de ~380 m, é a citada em [P1] e [P2]. |
 | Alcance da fiscalização | Controla a redução da influência repressiva com a distância ao evento. | 750 m. | Referência na faixa de 0,5–1 km, sem ajuste formal [P3]. |
 | Platô da fiscalização | Define a referência temporal para a dissipação do efeito repressivo. | 180 dias. | Comparação antes/depois e event-study [P3]. |
-| `r₀` | Controla a velocidade básica de expansão. | Ajuste externo com a expansão observada em período conhecido. | Formulação do projeto [P1]. |
+| `r₀` | Controla a velocidade básica de expansão. | 0,0007 por dia (até a 0.3.7, 0,004); recalibre para o período. | Calibração 2020–2022 na APA do Tapajós; ver "Origem dos padrões" abaixo. |
 | `α` | Controla a intensidade da ativação por alertas. | Ajuste externo. | Formulação do projeto [P1]. |
 | `F_max` | Controla a redução máxima da taxa de expansão por fiscalização. | Ajuste externo, entre 0 e 1. | Formulação do projeto [P1]. |
 | Piso das variáveis | Define o menor valor admitido nas evidências usadas pelo modelo estático. | Valor configurado na ferramenta estática. | Formulação do projeto [P1]. |
 | Teto fixo | Permite atribuir um nível de capacidade escolhido pelo usuário. | Opção da ferramenta estática; o README de origem menciona o valor 0,70 usado em versão anterior. | Documentação do projeto [P1]. |
+
+**Origem dos padrões de `r₀` e da escala de contágio (0.4.0).** Vêm da calibração em lote (`tools/calibrar_noite.py`) contra o garimpo do MapBiomas na APA do Tapajós, em grade de 150 m, com o K final da dissertação, em dois períodos: 2020–2022 e 2022–2024.
+
+- **Escala de contágio:** 100 m foi a melhor escala nos dois períodos e nos dois modos (previsão e reconstrução), em ordem estrita: 100 > 150 > 200 > 380 m. Em previsão, a AUC foi de 0,920 e 0,879 a 100 m, contra 0,860 e 0,825 a 380 m. 100 m foi o menor valor testado e fica abaixo do pixel de 150 m: a conclusão é "contágio de curto alcance, no limite da resolução", não 100 m exatos.
+- **`r₀`:** é o valor que iguala a área nova prevista à observada em 2020–2022 (0,000656). Em 2022–2024, o valor calibrado foi 0,000244: o ritmo da expansão caiu 2,7 vezes, e `r₀` não se transfere entre períodos. O padrão anterior, 0,004, superestimava a área nova de 11 a 33 vezes.
+- **Fiscalização:** o fatorial de platô, alcance e `F_max` não mudou nenhuma métrica do mapa da APA; os padrões ficam como estão.
+
+A janela de ocupação do modelo estático continua em 380 m: é a escala em que o K da dissertação foi calibrado, e mudá-la mudaria K.
+
+`tools/calibrar_noite.py` continua montando os planos a partir dos padrões anteriores (`BASE_PLANO`: 0,004 e 380 m), para que as rodadas já feitas sigam retomáveis e comparáveis.
 
 Os valores da fiscalização vêm do artigo [P3]:
 
@@ -132,16 +143,20 @@ Uma evidência igual a zero, com peso positivo, anula o produto. O **Piso das va
 
 O projeto estima o nível de `K` por **substituição espaço-tempo**: utiliza locais com maior tempo de exposição ao processo como referência para a ocupação que terrenos semelhantes podem alcançar.
 
-Para cada classe de favorabilidade, calcula-se um quantil alto da ocupação local, medida em uma janela associada à escala de contágio. Um quantil alto é um valor abaixo do qual se encontra uma parcela elevada das observações. O ajuste por **PAVA** reúne classes adjacentes que violam a ordem crescente e produz uma curva monotônica entre escore e capacidade [P1, 3].
+Para cada classe de favorabilidade, calcula-se um quantil alto da ocupação local, medida em uma janela associada à escala de contágio. Entram só os pixels de exposição longa: aqueles cuja janela tem garimpo no mapa do ano mais antigo, ao menos meio pixel. Até a versão 0.3.5, o ruído numérico da convolução fazia cerca de metade da área contar como madura, o que puxava o nível para baixo; um K gerado com o mapa do ano mais antigo antes da 0.3.6 deve ser gerado de novo. Um quantil alto é um valor abaixo do qual se encontra uma parcela elevada das observações. O ajuste por **PAVA** reúne classes adjacentes que violam a ordem crescente e produz uma curva monotônica entre escore e capacidade [P1, 3].
 
 | Símbolo | Significado | Unidade ou intervalo | Fonte |
 |---|---|---|---|
 | `K(x)` | Capacidade de ocupação por garimpo estimada para o pixel `x`. | Fração da área do pixel, entre 0 e 1, na saída do modelo estático. | Calibração do projeto [P1]. |
-| `μ(x)`, mu | Ocupação observada por garimpo, usada na calibração ou no diagnóstico estático. | Fração da área do pixel. | Mapeamento histórico [P1, P2]. |
+| `μ(x)`, mu | Ocupação observada por garimpo, usada na calibração ou no diagnóstico estático. A ferramenta a calcula a partir do **mapa de garimpo (0/1)** do ano de referência; o nível usa a média de `μ` na janela de ocupação. | Fração da área do pixel. | Mapeamento histórico [P1, P2]. |
+
+Os três insumos de ocupação da ferramenta — **mapa de garimpo (0/1)** do ano de referência, do ano mais antigo e do ano anterior — são os mapas anuais como vêm do MapBiomas (só a classe de garimpo), **sem suavizar**: a ferramenta calcula a vizinhança. Um mapa já suavizado seria suavizado de novo, e o nível de K sairia mais baixo e num suporte maior que a janela declarada. A ferramenta avisa quando o mapa tem muitos valores entre 0 e 1 na própria resolução.
 
 A ocupação observada participa da calibração da curva que converte o escore em capacidade. As evidências de terreno determinam a ordenação espacial. A avaliação deve usar períodos distintos para calibrar a curva e verificar seu desempenho.
 
-A capacidade estimada pode ficar abaixo da ocupação potencial de locais que ainda estão em expansão. Sua interpretação depende do tempo de exposição, da cobertura dos dados e da qualidade do ajuste. O projeto trata o leito dos rios como um estrato com curva própria, para representar as condições do garimpo em embarcações [P1].
+A capacidade estimada pode ficar abaixo da ocupação potencial de locais que ainda estão em expansão. Sua interpretação depende do tempo de exposição, da cobertura dos dados e da qualidade do ajuste. O projeto trata o leito dos rios como um estrato com curva própria, para representar as condições do garimpo em embarcações [P1]. Com a máscara de água, a ferramenta grava também `<prefixo>_saturacao_agua.csv` e `<prefixo>_saturacao_terra.csv`, com o nível que cada estrato recebeu, e o registro informa, por estrato, a área, a área madura, se a curva própria foi usada e o teto. Um estrato sem pixels maduros suficientes para estimar a própria curva fica com a curva geral; o registro e o registro de execução dizem por quê.
+
+**Área de cálculo e recortes.** A curva escore → nível é estimada com os pixels de exposição longa de toda a área da máscara. Por isso, o projeto gera K para a Província Mineral do Tapajós inteira e só depois o recorta para cada uso: a área de estudo nas análises e a área de estudo com a faixa de entorno nas simulações do modelo dinâmico. O recorte não altera o valor de K em nenhum pixel, porque cada pixel recebe o nível da curva estimada na Província, aplicada ao seu escore. Calibrar na área ampla aproveita toda a exposição observada e mantém a mesma curva em todos os recortes; a hipótese implícita é que a relação entre terreno e saturação é a mesma em toda a Província. Gerar K só na área de estudo teria dois efeitos indesejados: menos pixels maduros por faixa de escore, com faixas inteiras sem dado e de nível extrapolado; e K = 0 fora dela, o que, no modelo dinâmico, zera a ocupação da faixa de entorno e corta o contágio vindo de fora. Os totais do registro e da agregação por sub-bacia se referem à área da máscara usada na geração; para a área de estudo, recorte K ou filtre as sub-bacias.
 
 ### Potencial remanescente e agregação
 
@@ -222,7 +237,7 @@ O símbolo `h` representa o passo de integração, em dias nesta convenção; `�
 
 ### Propagação e eventos
 
-O contágio utiliza distância euclidiana e uma escala local próxima de 380 m. A sub-bacia recebe os resultados agregados após a simulação. Esse arranjo conserva a resolução espacial dos processos durante o cálculo.
+O contágio utiliza distância euclidiana e uma escala local de ~100 m (ver "Origem dos padrões"). A sub-bacia recebe os resultados agregados após a simulação. Esse arranjo conserva a resolução espacial dos processos durante o cálculo.
 
 Quando `C(μ) = 0`, a taxa de expansão calculada pela equação é zero. A opção de **semeadura por alertas** introduz ocupação a partir de detecções de garimpo novo, conforme a configuração do projeto.
 
@@ -318,8 +333,9 @@ O registro descreve os arquivos listados em `saidas`. Antes da primeira saída, 
 - **Janelas de eventos:** eventos agrupados na mesma janela compartilham uma data de referência. Escolha uma janela compatível com a duração dos efeitos; o projeto exemplifica 30 dias para um platô de 180 dias [P1].
 - **Intensidade dos efeitos:** ajuste `r₀`, `α` e `F_max` com dados observados. A forma das funções temporais e espaciais constitui uma parte da parametrização.
 - **Memória:** muitas janelas em rasters extensos aumentam a demanda. Avalie a resolução e o número de janelas em conjunto com as escalas dos processos.
-- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. As métricas estão em `core/validacao.py` e a validação de uma execução em `core/execucao_validacao.py`, descritas abaixo; a ferramenta na interface ainda não existe.
+- **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. A ferramenta **Validar uma execução** faz essa comparação; as métricas e o procedimento estão descritos abaixo.
 - **Calibração em lote:** `tools/calibrar_noite.py` roda, no Console Python do QGIS, centenas de simulações entre duas datas com mapas de garimpo e compara a expansão prevista com a observada. Primeiro calibra `r₀` para a área nova prevista igualar a observada; depois varia os demais parâmetros, com um fatorial de platô, alcance e `F_max` da fiscalização, e compara o modelo com alternativas sem dinâmica (só `K`, remanescente, proximidade ao garimpo existente). Grava cada simulação num CSV assim que termina, retoma de onde parou e escreve `resumo.txt`. `tools/calibrar_paralelo.py` roda o mesmo plano em vários processos, fora do QGIS. `fora_da_amostra(treino, teste)` compara dois períodos rodados com o mesmo plano: escolhe os parâmetros num período e mede o desempenho no outro, sem simular de novo. As instruções estão no início de cada arquivo.
+- **K acrescenta informação?** `tools/experimento_k.py` compara, em cada período e em recortes pela distância ao garimpo de `t₀` (geral, até 1 km, 1–5 km, mais de 5 km), a proximidade ao garimpo existente `P` com `S = P × máx(K − O₀, 0)` para o K atual, o K sem Est e K = 1. O K sem Est é gerado pelo modelo estático com a mesma configuração do registro do K atual, sem Est; antes, o K atual é regerado e conferido contra o arquivo. `O₀` é a ocupação na janela de ocupação, o mesmo suporte em que K é calibrado, e `P` é calculado por soma direta, sem o ruído da FFT, de modo que é zero fora do alcance do núcleo: onde `P = 0` em todo o recorte, a comparação é registrada como redundante. Mede captura nos 1, 5 e 10% da área, AUC e `r_blocos`, com intervalos de 95% das diferenças por bootstrap pareado por sub-bacia, e reproduz as linhas de base da calibração do mesmo período. Roda em modo `piloto` (um período, poucas réplicas) e `completo`; o segundo reaproveita o K sem Est e a conferência do primeiro.
 
 A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_permanentemente`. Ele examina, em um cenário sintético, a persistência de diferenças de trajetória após a fiscalização perder intensidade. A duração e a magnitude dessas diferenças dependem dos parâmetros, da saturação e do horizonte analisado. A interpretação territorial exige comparação com dados observados.
 
@@ -338,7 +354,7 @@ A rotina `core/validacao.py` compara a expansão prevista `Δμ` com o garimpo n
 
 Empates, inevitáveis porque o risco é zero em boa parte da área, são tratados por posto médio na AUC e por rateio proporcional na captura; assim, nenhuma métrica depende da ordem dos pixels no raster. O universo da avaliação é a área de estudo inteira, inclusive onde `K = 0`: garimpo novo fora de `K` é erro do modelo e deve contar.
 
-**Validar uma execução.** `core/execucao_validacao.py` parte do registro de uma execução do modelo dinâmico e só pede o garimpo observado na data final. No Console Python do QGIS:
+**Validar uma execução.** Em **Raster → Risco Garimpo → Validar uma execução…**, escolha o registro da execução (o `<prefixo>_registro_<data>.json` gravado pelo modelo dinâmico) e o garimpo observado na data final; os demais campos são preenchidos pelo registro. A mesma rotina, `core/execucao_validacao.py`, pode ser chamada no Console Python do QGIS:
 
 ```python
 from risco_garimpo.core import execucao_validacao as v
@@ -352,7 +368,7 @@ Do registro saem a expansão prevista, `μ₀`, `K`, a máscara e as datas. O SH
 
 | Arquivo | Conteúdo |
 |---|---|
-| `_metricas.csv` | Uma linha para o modelo e uma para cada linha de base, com todas as métricas da tabela acima. |
+| `_metricas.csv` | Uma linha para o modelo e uma para cada linha de base (proximidade em 100, 150, 200, 300, 380 e 500 m e, com `K`, as que usam o potencial), com todas as métricas da tabela acima. |
 | `_curva_captura.csv` e `_curva_captura.png` | Curva de captura do modelo e das linhas de base; a figura traz o modelo, a melhor linha de base e o acaso. A figura exige matplotlib, que acompanha o QGIS. |
 | `_subbacias.gpkg` | Com uma camada de sub-bacias: `va_prev_ha` e `va_obs_ha`, as áreas novas prevista e observada, e `va_rank_prev` e `va_rank_obs`, as posições nas duas ordenações. |
 | `_registro.json` | Registro da validação, com as métricas, os avisos e o SHA-256 dos insumos. |
@@ -378,6 +394,7 @@ Para que a comparação tenha sentido, o modelo precisa superar alternativas sem
 | `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
 | `core/validacao.py` | Métricas de validação da expansão prevista contra o garimpo novo observado. |
 | `core/execucao_validacao.py` | Orquestração da validação de uma execução: leitura alinhada, métricas, linhas de base, curva de captura, sub-bacias e registro. |
+| `compat.py` | Diferenças entre o QGIS 3 (Qt5) e o QGIS 4 (Qt6): nomes de enum com escopo, tipos de geometria e de campo. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
 | `tools/` | Geração de interfaces, empacotamento e dados de teste. |
 | `tests/` | Testes do núcleo e contratos de interface. |
@@ -386,7 +403,7 @@ Os caminhos do núcleo são relativos à pasta `risco_garimpo/`. As responsabili
 
 Cada ferramenta organiza o trabalho em três fases: **preparar**, na thread principal, acessa as camadas do projeto; **executar**, em segundo plano, realiza os cálculos; **agregar/escrever**, na thread principal, finaliza as saídas.
 
-A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu e roda também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais; fora desse ambiente, esse teste é pulado.
+A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu, e um terceiro o QGIS 4.2 do conda-forge; os dois rodam também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais e abre o plugin e os três diálogos; fora desses ambientes, esse teste é pulado.
 
 O arquivo `tests/test_contrato_ui.py` verifica os componentes utilizados pelos diálogos e a correspondência entre os arquivos de interface e seus geradores.
 

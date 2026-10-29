@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Núcleos de contágio espacial.
 
-A escala de contágio local estimada empiricamente (~380 m) é a distância
+A escala de contágio local (~100 m, calibrada em 2020–2024 na APA do
+Tapajós; a estimativa experimental anterior era ~380 m) é a distância
 característica em que a presença de garimpo eleva a probabilidade de novo
 garimpo. O núcleo é normalizado para somar 1, de modo que a pressão de
 contágio ``C`` resultante da convolução esteja na mesma escala de ``mu``
@@ -21,7 +22,7 @@ def kernel_contagio(escala_m, pixel_m, tipo="exponencial", raio_escalas=3.0,
     Parameters
     ----------
     escala_m : float
-        Distância característica do contágio, em metros (padrão do modelo: 380).
+        Distância característica do contágio, em metros (padrão do modelo: 100).
     pixel_m : float
         Tamanho do pixel em metros.
     tipo : {'exponencial', 'gaussiano'}

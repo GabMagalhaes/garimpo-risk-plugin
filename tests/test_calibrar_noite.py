@@ -126,3 +126,33 @@ def test_fora_da_amostra_escolhe_no_treino_e_mede_no_teste(roteiro, tmp_path):
     assert "mediana no teste: AUC 0.740" in texto     # média de 0,88 e 0,60
     assert "NÃO supera" in texto
     assert os.path.isfile(os.path.join(teste, "fora_da_amostra.txt"))
+
+
+def test_configuracoes_extras_rodam_como_vieram(roteiro):
+    """Escolhidas em outro período: o r0 delas vale, não o calibrado aqui."""
+    roteiro["CONFIG"]["CONFIGURACOES_EXTRAS"] = [
+        {"r0": 0.0007, "escala_contagio_m": 100.0, "k_fator": 1.5},
+        {"r0": 0.0007, "escala_contagio_m": 100.0, "k_fator": 1.0}]
+    extras = [it for it in roteiro["_plano_restante"](Parametros(), 0.01)
+              if it["etapa"] == "extra"]
+    assert len(extras) == 4
+    assert {it["modo"] for it in extras} == {"previsao", "reconstrucao"}
+    assert all(it["params"]["r0"] == 0.0007 for it in extras)
+    assert [it["params"].get("k_fator") for it in extras] == [1.5, 1.5,
+                                                               None, None]
+    outro_r0 = [it["id"] for it in roteiro["_plano_restante"](
+        Parametros(), 0.0003) if it["etapa"] == "extra"]
+    assert outro_r0 == [it["id"] for it in extras]
+
+
+def test_a_base_dos_planos_nao_segue_os_padroes_do_plugin(roteiro):
+    """Os ids das rodadas já feitas dependem da base dos planos, fixada nos
+    padrões até a 0.3.7; os padrões do plugin mudaram na 0.4.0."""
+    from risco_garimpo.core import model
+    base = roteiro["parametros_base"](model)
+    assert (base.r0, base.escala_contagio_m) == (0.004, 380.0)
+    padrao = model.Parametros()
+    assert (padrao.r0, padrao.escala_contagio_m) == (0.0007, 100.0)
+    ids = {it["id"] for it in roteiro["_plano_inicial"](base)}
+    assert ids == {it["id"] for it in roteiro["_plano_inicial"](
+        model.Parametros(r0=0.004, escala_contagio_m=380.0))}

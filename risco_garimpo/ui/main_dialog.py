@@ -4,7 +4,7 @@
 import datetime as _dt
 import os
 
-from qgis.core import (Qgis, QgsApplication, QgsColorRampShader,
+from qgis.core import (QgsApplication, QgsColorRampShader,
                        QgsCoordinateReferenceSystem, QgsProject,
                        QgsRasterLayer, QgsRasterShader, QgsSettings,
                        QgsSingleBandPseudoColorRenderer, QgsVectorLayer)
@@ -15,6 +15,7 @@ from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QDialog,
                                  QDoubleSpinBox, QFileDialog, QLineEdit,
                                  QMessageBox, QSpinBox)
 
+from .. import compat
 from ..core.execucao import (Configuracao, ConfiguracaoInvalida, agregar,
                              caminhos_de_saida, preparar)
 from ..core.model import Parametros
@@ -371,8 +372,8 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
 
         self._etapa("Concluído.")
         self.iface.messageBar().pushMessage(
-            "Risco Garimpo", "Simulação concluída.", level=Qgis.Success,
-            duration=6)
+            "Risco Garimpo", "Simulação concluída.",
+            level=compat.nivel_sucesso(), duration=6)
 
     def _terminada(self):
         tarefa, self.tarefa = self.tarefa, None
@@ -416,7 +417,7 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
                 return
             shader = QgsRasterShader()
             rampa = QgsColorRampShader()
-            rampa.setColorRampType(QgsColorRampShader.Interpolated)
+            rampa.setColorRampType(compat.interpolacao_linear())
             itens = []
             for fracao, cor in CORES_RISCO:
                 valor = minimo + fracao * (maximo - minimo)
@@ -473,8 +474,8 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
             resposta = QMessageBox.question(
                 self, "Simulação em andamento",
                 "Cancelar a simulação e fechar?",
-                QMessageBox.Yes | QMessageBox.No)
-            if resposta != QMessageBox.Yes:
+                _botao("Yes") | _botao("No"))
+            if resposta != _botao("Yes"):
                 evento.ignore()
                 return
             self.tarefa.cancel()
@@ -483,13 +484,20 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
 
 
 # ------------------------------------------------------------------ auxiliares
+def _botao(nome):
+    return compat.membro(QMessageBox, "StandardButton", nome)
+
+
+_ISO = compat.membro(Qt, "DateFormat", "ISODate")
+
+
 def _para_data(qdate):
     return _dt.date(qdate.year(), qdate.month(), qdate.day())
 
 
 def _valor_widget(widget):
     if isinstance(widget, QDateEdit):
-        return widget.date().toString(Qt.ISODate)
+        return widget.date().toString(_ISO)
     if isinstance(widget, QCheckBox):
         return widget.isChecked()
     if isinstance(widget, (QDoubleSpinBox, QSpinBox)):
@@ -504,7 +512,7 @@ def _valor_widget(widget):
 def _definir_widget(widget, valor):
     try:
         if isinstance(widget, QDateEdit):
-            data = QDate.fromString(str(valor), Qt.ISODate)
+            data = QDate.fromString(str(valor), _ISO)
             if data.isValid():
                 widget.setDate(data)
         elif isinstance(widget, QCheckBox):

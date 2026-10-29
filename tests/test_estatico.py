@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from risco_garimpo.core.estatico import (  # noqa: E402
     aplicar_nivel, curva_de_nivel, diagnosticar_veto, fuzzy_gamma, gerar_k,
-    isotonica, normalizar, ocupacao_local, saturacao_por_faixa)
+    isotonica, lado_da_janela, maduros, normalizar, ocupacao_local,
+    saturacao_por_faixa)
 
 
 # ------------------------------------------------------------- normalização
@@ -102,6 +103,41 @@ def test_bloco_saturado_tem_ocupacao_um_no_centro():
     mu[10:50, 10:50] = 1.0
     ocup = ocupacao_local(mu, pixel_m=30.0, janela_m=300.0)
     assert ocup[30, 30] == pytest.approx(1.0, abs=1e-5)
+
+
+
+def _janelas_com_garimpo(mapa, lado):
+    """Conta exata (sem FFT) dos pixels de garimpo em cada janela."""
+    r = lado // 2
+    positivo = np.pad((mapa > 0).astype(np.int64), r)
+    acumulado = np.pad(positivo.cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    ny, nx = mapa.shape
+    return (acumulado[lado:lado + ny, lado:lado + nx]
+            - acumulado[:ny, lado:lado + nx]
+            - acumulado[lado:lado + ny, :nx] + acumulado[:ny, :nx])
+
+
+def test_maduros_sao_exatamente_as_janelas_com_garimpo_antigo():
+    rng = np.random.default_rng(5)
+    antigo = np.zeros((900, 900), dtype=np.float32)
+    for _ in range(12):
+        y, x = rng.integers(20, 860, 2)
+        antigo[y:y + 15, x:x + 20] = rng.random((15, 20)) < 0.6
+    assert lado_da_janela(30.0, 380.0) == 13
+    esperado = _janelas_com_garimpo(antigo, 13) > 0
+    obtido = maduros(antigo, 30.0, 380.0)
+    assert np.array_equal(obtido, esperado)
+    # o critério antigo (ocupação > 0) marcava o ruído da convolução
+    assert obtido.mean() < 0.1
+
+
+def test_maduro_exige_meio_pixel_de_garimpo_na_janela():
+    antigo = np.zeros((61, 61), dtype=np.float32)
+    antigo[10, 10] = 0.4          # menos de meio pixel: não conta
+    antigo[40, 40] = 0.6
+    resultado = maduros(antigo, 30.0, 380.0)
+    assert not resultado[10, 10] and resultado[40, 40]
+    assert resultado[40, 46] and not resultado[40, 47]   # borda da janela
 
 
 # ------------------------------------------------------------------ isotônica
@@ -278,3 +314,24 @@ def test_estratos_recebem_niveis_proprios():
                 estratos={"agua": agua, "terra": ~agua})
     assert set(r.por_estrato) == {"agua", "terra"}
     assert r.K[agua].max() > r.K[~agua].max()
+    assert all(n.curva is not None and n.motivo is None
+               for n in r.por_estrato.values())
+
+
+def test_estrato_com_poucos_maduros_diz_por_que_ficou_com_a_geral():
+    rng = np.random.default_rng(6)
+    forma = (200, 200)
+    ibx = rng.random(forma).astype(np.float32)
+    mu = (rng.random(forma) < 0.3 * ibx).astype(np.float32)
+    agua = np.zeros(forma, bool)
+    agua[:5, :5] = True                   # 25 pixels: faixas sem amostra
+    r = gerar_k([ibx], ["IBx"], [1.0], 0.4, mu, pixel_m=30.0,
+                maduro=np.ones(forma, bool), n_faixas=20,
+                minimo_por_faixa=100,
+                estratos={"agua": agua, "terra": ~agua})
+    nivel = r.por_estrato["agua"]
+    assert nivel.curva is None and "insuficientes" in nivel.motivo
+    assert nivel.pixels == 25 and nivel.maduros == 25
+    assert nivel.centros is not None      # o observado fica para a tabela
+    np.testing.assert_allclose(r.K[agua],
+                               aplicar_nivel(r.escore[agua], *r.curva))

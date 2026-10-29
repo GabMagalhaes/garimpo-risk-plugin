@@ -86,7 +86,7 @@ class Configuracao(object):
                 "informe o raster de capacidade de suporte K (favorabilidade).")
         if not self.caminho_mu0:
             raise ConfiguracaoInvalida(
-                "informe o raster de estado inicial μ₀ (garimpo existente).")
+                "informe o mapa de garimpo (0/1) da data inicial.")
         if not self.pasta_saida:
             raise ConfiguracaoInvalida("informe a pasta de saída.")
         if not isinstance(self.data_inicio, _dt.date) or \
@@ -138,7 +138,7 @@ def preparar(config, log=None):
     if grade.geografica:
         raise ConfiguracaoInvalida(
             "a grade de trabalho está em coordenadas geográficas. O modelo "
-            "opera em metros (contágio de ~380 m, repressão de 0,5–1 km): "
+            "opera em metros (contágio de ~100 m, repressão de 0,5–1 km): "
             "escolha um CRS projetado, por exemplo SIRGAS 2000 / UTM 21S "
             "(EPSG:31981).")
     _log("Grade de trabalho: %s" % grade.descricao())
@@ -259,6 +259,10 @@ def executar(config, preparo, progresso=None, log=None):
     _passo(0.08, "Lendo μ₀ (estado inicial)")
     mu0 = _raster.ler_alinhado(config.caminho_mu0, grade,
                                config.reamostragem_mu0)
+    aviso = _raster.aviso_de_mapa(config.caminho_mu0,
+                                  "mapa de garimpo da data inicial")
+    if aviso:
+        _log(aviso)
 
     mascara = None
     if config.caminho_mascara:

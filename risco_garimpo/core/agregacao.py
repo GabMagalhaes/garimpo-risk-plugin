@@ -5,7 +5,7 @@ A dinâmica é resolvida no pixel. Só depois de propagar é que os resultados
 são somados por sub-bacia HydroBASINS nível 12, para leitura operacional e
 priorização. A ordem importa: agregar antes de propagar dilui o efeito
 repressivo (raio de 0,5–1 km sobre sub-bacias de mediana > 100 km²) abaixo do
-ruído e destrói as escalas de 380 m e 3.500 m.
+ruído e destrói as escalas de ~100 m e 3.500 m.
 """
 
 import os
@@ -31,7 +31,7 @@ def rasterizar_zonas(camada, grade, progresso=None):
     from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform,
                            QgsFeature, QgsField, QgsProject, QgsVectorLayer,
                            QgsVectorFileWriter, QgsWkbTypes)
-    from qgis.PyQt.QtCore import QVariant
+    from ..compat import membro, tipo_de_campo
 
     destino = QgsCoordinateReferenceSystem()
     destino.createFromWkt(grade.wkt)
@@ -42,7 +42,7 @@ def rasterizar_zonas(camada, grade, progresso=None):
     temporaria = QgsVectorLayer("%s?crs=%s" % (tipo, destino.authid() or destino.toWkt()),
                                 "zonas_tmp", "memory")
     provedor = temporaria.dataProvider()
-    provedor.addAttributes([QgsField(CAMPO_INDICE, QVariant.Int)])
+    provedor.addAttributes([QgsField(CAMPO_INDICE, tipo_de_campo(True))])
     temporaria.updateFields()
 
     originais = []
@@ -70,7 +70,8 @@ def rasterizar_zonas(camada, grade, progresso=None):
     opcoes.driverName = "GPKG"
     erro = QgsVectorFileWriter.writeAsVectorFormatV3(
         temporaria, caminho, QgsProject.instance().transformContext(), opcoes)
-    if isinstance(erro, (list, tuple)) and erro[0] != QgsVectorFileWriter.NoError:
+    if isinstance(erro, (list, tuple)) and erro[0] != membro(
+            QgsVectorFileWriter, "WriterError", "NoError"):
         raise IOError("falha ao preparar as zonas: %s" % (erro,))
 
     alvo = gdal.GetDriverByName("MEM").Create("", grade.nx, grade.ny, 1,
@@ -184,7 +185,7 @@ def _escrever_gpkg(caminho, camada_original, feicoes, linhas,
                    nome_camada="risco_subbacias"):
     from qgis.core import (QgsFeature, QgsField, QgsProject, QgsVectorLayer,
                            QgsVectorFileWriter, QgsWkbTypes)
-    from qgis.PyQt.QtCore import QVariant
+    from ..compat import membro, tipo_de_campo
 
     tipo = QgsWkbTypes.displayString(camada_original.wkbType()) or "Polygon"
     saida = QgsVectorLayer("%s?crs=%s" % (tipo, camada_original.crs().authid()),
@@ -192,7 +193,7 @@ def _escrever_gpkg(caminho, camada_original, feicoes, linhas,
     provedor = saida.dataProvider()
     campos = list(camada_original.fields())
     acrescentados = campos_de_saida(linhas)
-    novos = [QgsField(nome, QVariant.Int if inteiro else QVariant.Double)
+    novos = [QgsField(nome, tipo_de_campo(inteiro))
              for nome, inteiro in acrescentados]
     provedor.addAttributes(campos + novos)
     saida.updateFields()
@@ -214,6 +215,7 @@ def _escrever_gpkg(caminho, camada_original, feicoes, linhas,
     opcoes.layerName = nome_camada
     erro = QgsVectorFileWriter.writeAsVectorFormatV3(
         saida, caminho, QgsProject.instance().transformContext(), opcoes)
-    if isinstance(erro, (list, tuple)) and erro[0] != QgsVectorFileWriter.NoError:
+    if isinstance(erro, (list, tuple)) and erro[0] != membro(
+            QgsVectorFileWriter, "WriterError", "NoError"):
         raise IOError("falha ao gravar %s: %s" % (caminho, erro))
     return caminho

@@ -17,7 +17,8 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UI = os.path.join(RAIZ, "risco_garimpo", "ui")
 
 PARES = [("estatico_dialog.py", "estatico_dialog_base.ui"),
-         ("main_dialog.py", "main_dialog_base.ui")]
+         ("main_dialog.py", "main_dialog_base.ui"),
+         ("validacao_dialog.py", "validacao_dialog_base.ui")]
 
 # atributos do próprio QDialog ou definidos no __init__ do diálogo
 HERDADOS = {
@@ -110,3 +111,38 @@ def test_o_gerador_reproduz_o_ui_versionado():
     atual = open(os.path.join(UI, "estatico_dialog_base.ui"),
                  encoding="utf-8").read()
     assert gerar_ui_estatico.construir() == atual
+
+
+def test_o_ui_da_validacao_tem_os_campos_que_a_configuracao_exige():
+    nomes = _widgets_do_ui(os.path.join(UI, "validacao_dialog_base.ui"))
+    exigidos = ["linhaRegistro", "btnRegistro", "lblExecucao",
+                "linhaPrevisto", "btnPrevisto", "linhaMuInicial",
+                "btnMuInicial", "linhaK", "btnK", "linhaMascara",
+                "btnMascara", "linhaMuFinal", "btnMuFinal", "linhaAvaliacao",
+                "btnAvaliacao", "comboSubbacias", "linhaCampoId",
+                "spinLimiar", "spinBloco", "spinTopo", "linhaPasta",
+                "btnPasta", "linhaPrefixo", "checkFigura", "checkCarregar",
+                "btnExecutar", "btnCancelar", "btnFechar", "barraProgresso",
+                "lblStatus", "textoLog", "abas", "abaRegistro"]
+    faltando = [e for e in exigidos if e not in nomes]
+    assert not faltando, "faltam no .ui: %s" % ", ".join(faltando)
+
+
+def test_o_gerador_reproduz_o_ui_da_validacao():
+    import sys
+    sys.path.insert(0, os.path.join(RAIZ, "tools"))
+    import gerar_ui_validacao
+
+    atual = open(os.path.join(UI, "validacao_dialog_base.ui"),
+                 encoding="utf-8").read()
+    assert gerar_ui_validacao.construir() == atual
+
+
+def test_o_plugin_registra_as_tres_ferramentas():
+    fonte = open(os.path.join(RAIZ, "risco_garimpo", "plugin.py"),
+                 encoding="utf-8").read()
+    arvore = ast.parse(fonte)
+    metodos = {no.name for no in ast.walk(arvore)
+               if isinstance(no, ast.FunctionDef)}
+    assert {"abrir_estatico", "abrir_dinamico", "abrir_validacao"} <= metodos
+    assert "ui.validacao_dialog" in fonte

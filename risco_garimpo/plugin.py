@@ -1,29 +1,35 @@
 # -*- coding: utf-8 -*-
-"""Registro do plugin no QGIS: duas ferramentas, um menu.
+"""Registro do plugin no QGIS: três ferramentas, um menu.
 
 A separação entre elas é de arquivo, não de chamada: o modelo estático grava
 `K.tif`; o modelo dinâmico o lê como qualquer raster. Nenhum dos dois importa
-o código do outro, e nada reprocessa o estático a cada simulação.
+o código do outro, e nada reprocessa o estático a cada simulação. A
+validação lê o registro e as saídas de uma execução do dinâmico.
 """
 
 import os
 
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+
+try:  # Qt6 (QGIS 4): QAction passou para QtGui
+    from qgis.PyQt.QtGui import QAction
+except ImportError:  # Qt5 (QGIS 3)
+    from qgis.PyQt.QtWidgets import QAction
 
 PLUGIN_DIR = os.path.dirname(__file__)
 MENU_TITLE = "Risco Garimpo"
 
 
 class RiscoGarimpoPlugin:
-    """Modelo estático (K) e modelo dinâmico (expansão)."""
+    """Modelo estático (K), modelo dinâmico (expansão) e validação."""
 
     def __init__(self, iface):
         self.iface = iface
         self.acoes = []
         self.dialogo_dinamico = None
         self.dialogo_estatico = None
+        self.dialogo_validacao = None
 
     # ------------------------------------------------------------------ QGIS
     def _icone(self):
@@ -53,6 +59,11 @@ class RiscoGarimpoPlugin:
             "Simula a expansão do garimpo ilegal em superfície contínua, "
             "consumindo K como capacidade de suporte.",
             "riscoGarimpoAction", self.abrir_dinamico, barra=True)
+        self._acao(
+            "Validar uma execução…",
+            "Compara a expansão prevista de uma execução com o garimpo "
+            "observado: AUC, curva de captura, linhas de base e sub-bacias.",
+            "riscoGarimpoValidacaoAction", self.abrir_validacao, barra=False)
 
     def unload(self):
         for acao, barra in self.acoes:
@@ -60,7 +71,8 @@ class RiscoGarimpoPlugin:
             if barra:
                 self.iface.removeToolBarIcon(acao)
         self.acoes = []
-        for atributo in ("dialogo_dinamico", "dialogo_estatico"):
+        for atributo in ("dialogo_dinamico", "dialogo_estatico",
+                         "dialogo_validacao"):
             dialogo = getattr(self, atributo)
             if dialogo is not None:
                 dialogo.close()
@@ -89,6 +101,14 @@ class RiscoGarimpoPlugin:
             self.dialogo_estatico = EstaticoDialog(
                 self.iface, self.iface.mainWindow())
         self._mostrar(self.dialogo_estatico)
+
+    def abrir_validacao(self):
+        from .ui.validacao_dialog import ValidacaoDialog
+
+        if self.dialogo_validacao is None:
+            self.dialogo_validacao = ValidacaoDialog(
+                self.iface, self.iface.mainWindow())
+        self._mostrar(self.dialogo_validacao)
 
     # --------------------------------------------------------- compatibilidade
     def run(self):
