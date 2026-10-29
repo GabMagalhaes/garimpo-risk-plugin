@@ -138,7 +138,7 @@ def preparar(config, log=None):
     if grade.geografica:
         raise ConfiguracaoInvalida(
             "a grade de trabalho está em coordenadas geográficas. O modelo "
-            "opera em metros (contágio de ~380 m, repressão de 0,5–1 km): "
+            "opera em metros (contágio de ~100 m, repressão de 0,5–1 km): "
             "escolha um CRS projetado, por exemplo SIRGAS 2000 / UTM 21S "
             "(EPSG:31981).")
     _log("Grade de trabalho: %s" % grade.descricao())

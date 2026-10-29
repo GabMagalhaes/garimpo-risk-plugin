@@ -15,7 +15,7 @@ onde
     nunca em K, sob pena de dupla contagem e de K endógeno.
 ``C(μ)``
     pressão de contágio local — convolução de μ por um núcleo de escala
-    ~380 m. É ele que implementa a propagação: sem vizinho ocupado não há
+    ~100 m (calibrada; a estimativa experimental anterior era ~380 m). É ele que implementa a propagação: sem vizinho ocupado não há
     crescimento, o que é coerente com o achado de que a geomorfologia prediz
     taxa de crescimento condicionada à presença, e não chegada em área virgem.
 ``(1 − μ/K)``
@@ -43,7 +43,7 @@ onde
 
 A propagação é euclidiana, não hidrológica, e ocorre **no pixel**. A
 sub-bacia é unidade de saída e reporte; agregar antes de propagar dilui o
-efeito repressivo abaixo do ruído e destrói as escalas de 380 m e 3.500 m.
+efeito repressivo abaixo do ruído e destrói as escalas de ~100 m e 3.500 m.
 """
 
 import datetime as _dt
@@ -62,8 +62,9 @@ class Parametros:
     """Parâmetros do modelo dinâmico (unidades: metros e dias)."""
 
     # crescimento e contágio
-    r0: float = 0.004
-    escala_contagio_m: float = 380.0
+    # calibrados na APA do Tapajós (0.4.0): ver README, "Origem dos padrões"
+    r0: float = 0.0007
+    escala_contagio_m: float = 100.0
     tipo_kernel: str = "exponencial"
     excluir_centro: bool = False
 

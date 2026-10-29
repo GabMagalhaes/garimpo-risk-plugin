@@ -5,11 +5,11 @@ qgisMinimumVersion=3.22
 qgisMaximumVersion=4.99
 supportsQt6=True
 description=Duas ferramentas: o modelo estático, que estima K — a proporção da área que se espera explorada no máximo —, e o modelo dinâmico, que simula a expansão do garimpo ilegal consumindo esse K.
-version=0.3.7
+version=0.4.0
 author=Gabriel Campos Magalhães (PPGEDAM/NUMA/UFPA)
 email=gabriel.campos.magalhaes@gmail.com
 
-about=Produto da dissertação sobre antecipação da expansão do garimpo ilegal na Província Mineral do Tapajós. Traz duas ferramentas independentes, separadas por arquivo e não por chamada. MODELO ESTÁTICO: combina as variáveis de terreno (PGgeom, Est, litologia) por fuzzy gamma ponderado, com piso contra o veto do produto, e devolve K em [0, 1] — a proporção da área do pixel que se espera explorada no máximo. O nível de K é estimado da saturação observada em terreno de exposição longa, por substituição espaço-tempo, e não decretado; o leito de rio recebe nível próprio, porque garimpo de balsa não obedece à geomorfologia de barranco. MODELO DINÂMICO: resolve, em superfície contínua, uma equação logística de crescimento em que K é a capacidade de suporte, o contágio opera na escala local (~380 m), os alertas entram como ativação com decaimento exponencial contínuo desde o dia zero e os autos de infração como supressão em platô logístico (platô de 180 dias, escolhido pela comparação antes/depois e corroborado por event-study; alcance de referência de 750 m, na faixa de 0,5–1 km, ainda sem ajuste formal). A sub-bacia HydroBASINS nível 12 é unidade de saída e reporte, nunca de propagação.
+about=Produto da dissertação sobre antecipação da expansão do garimpo ilegal na Província Mineral do Tapajós. Traz duas ferramentas independentes, separadas por arquivo e não por chamada. MODELO ESTÁTICO: combina as variáveis de terreno (PGgeom, Est, litologia) por fuzzy gamma ponderado, com piso contra o veto do produto, e devolve K em [0, 1] — a proporção da área do pixel que se espera explorada no máximo. O nível de K é estimado da saturação observada em terreno de exposição longa, por substituição espaço-tempo, e não decretado; o leito de rio recebe nível próprio, porque garimpo de balsa não obedece à geomorfologia de barranco. MODELO DINÂMICO: resolve, em superfície contínua, uma equação logística de crescimento em que K é a capacidade de suporte, o contágio opera na escala local (~100 m, calibrada na APA do Tapajós), os alertas entram como ativação com decaimento exponencial contínuo desde o dia zero e os autos de infração como supressão em platô logístico (platô de 180 dias, escolhido pela comparação antes/depois e corroborado por event-study; alcance de referência de 750 m, na faixa de 0,5–1 km, ainda sem ajuste formal). A sub-bacia HydroBASINS nível 12 é unidade de saída e reporte, nunca de propagação.
 
 tracker=https://github.com/GabMagalhaes/garimpo-risk-plugin/issues
 repository=https://github.com/GabMagalhaes/garimpo-risk-plugin
@@ -21,7 +21,8 @@ experimental=True
 deprecated=False
 
 hasProcessingProvider=no
-changelog=0.3.7 - Estratos (água e terra) no relatório: uma tabela de saturação por estrato e, no registro, a área, a área madura, se o estrato teve curva própria ou ficou com a geral (e por quê) e o teto. Antes, o estrato sem dados ficava com a curva geral em silêncio. K não muda.
+changelog=0.4.0 - Padrões calibrados na APA do Tapajós (2020–2024, grade de 150 m): escala de contágio 100 m (era 380 m) e r0 0,0007 por dia (era 0,004, que superestimava a área nova de 11 a 33 vezes); r0 muda entre períodos e deve ser recalibrado. tools/experimento_k.py: K × K sem Est × K = 1 contra a proximidade, com bootstrap por sub-bacia. calibrar_paralelo usa o plugin do perfil do QGIS em uso (QGIS3 ou QGIS4); os planos de calibração mantêm a base anterior.
+    0.3.7 - Estratos (água e terra) no relatório: uma tabela de saturação por estrato e, no registro, a área, a área madura, se o estrato teve curva própria ou ficou com a geral (e por quê) e o teto. Antes, o estrato sem dados ficava com a curva geral em silêncio. K não muda.
     0.3.6 - Correção: a maturidade (exposição longa) marcava como madura cerca de metade da área, por ruído numérico da convolução; agora é madura só a janela com garimpo do mapa antigo (ao menos meio pixel). Muda o nível de todo K gerado com o mapa do ano mais antigo.
     0.3.5 - Os insumos de ocupação passam a se chamar mapa de garimpo (0/1): o mapa anual, sem suavizar, do qual a ferramenta calcula μ. Aviso quando o mapa tem muitos valores entre 0 e 1 na própria resolução, sinal de mapa suavizado.
     0.3.4 - Compatível com o QGIS 4 (Qt6), sem deixar o QGIS 3.22 ou posterior; testado no QGIS 4.2.3 e no 3.34. A ferramenta Validar compara também com a proximidade em 100 e 150 m.

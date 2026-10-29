@@ -143,3 +143,16 @@ def test_configuracoes_extras_rodam_como_vieram(roteiro):
     outro_r0 = [it["id"] for it in roteiro["_plano_restante"](
         Parametros(), 0.0003) if it["etapa"] == "extra"]
     assert outro_r0 == [it["id"] for it in extras]
+
+
+def test_a_base_dos_planos_nao_segue_os_padroes_do_plugin(roteiro):
+    """Os ids das rodadas já feitas dependem da base dos planos, fixada nos
+    padrões até a 0.3.7; os padrões do plugin mudaram na 0.4.0."""
+    from risco_garimpo.core import model
+    base = roteiro["parametros_base"](model)
+    assert (base.r0, base.escala_contagio_m) == (0.004, 380.0)
+    padrao = model.Parametros()
+    assert (padrao.r0, padrao.escala_contagio_m) == (0.0007, 100.0)
+    ids = {it["id"] for it in roteiro["_plano_inicial"](base)}
+    assert ids == {it["id"] for it in roteiro["_plano_inicial"](
+        model.Parametros(r0=0.004, escala_contagio_m=380.0))}

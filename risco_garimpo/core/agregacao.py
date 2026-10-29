@@ -5,7 +5,7 @@ A dinâmica é resolvida no pixel. Só depois de propagar é que os resultados
 são somados por sub-bacia HydroBASINS nível 12, para leitura operacional e
 priorização. A ordem importa: agregar antes de propagar dilui o efeito
 repressivo (raio de 0,5–1 km sobre sub-bacias de mediana > 100 km²) abaixo do
-ruído e destrói as escalas de 380 m e 3.500 m.
+ruído e destrói as escalas de ~100 m e 3.500 m.
 """
 
 import os

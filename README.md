@@ -63,14 +63,24 @@ Confira o tamanho da **Grade resultante** e a memória estimada por camada antes
 
 | Parâmetro | Efeito no cálculo | Valor ou procedimento documentado | Fonte |
 |---|---|---|---|
-| Escala de contágio | Controla a distribuição espacial da influência da ocupação existente. | Aproximadamente 380 m. | Resultado da pesquisa citado em [P1] e [P2]. |
+| Escala de contágio | Controla a distribuição espacial da influência da ocupação existente. | 100 m (até a 0.3.7, 380 m). | Calibração 2020–2024 na APA do Tapajós; ver "Origem dos padrões" abaixo. A estimativa experimental anterior, de ~380 m, é a citada em [P1] e [P2]. |
 | Alcance da fiscalização | Controla a redução da influência repressiva com a distância ao evento. | 750 m. | Referência na faixa de 0,5–1 km, sem ajuste formal [P3]. |
 | Platô da fiscalização | Define a referência temporal para a dissipação do efeito repressivo. | 180 dias. | Comparação antes/depois e event-study [P3]. |
-| `r₀` | Controla a velocidade básica de expansão. | Ajuste externo com a expansão observada em período conhecido. | Formulação do projeto [P1]. |
+| `r₀` | Controla a velocidade básica de expansão. | 0,0007 por dia (até a 0.3.7, 0,004); recalibre para o período. | Calibração 2020–2022 na APA do Tapajós; ver "Origem dos padrões" abaixo. |
 | `α` | Controla a intensidade da ativação por alertas. | Ajuste externo. | Formulação do projeto [P1]. |
 | `F_max` | Controla a redução máxima da taxa de expansão por fiscalização. | Ajuste externo, entre 0 e 1. | Formulação do projeto [P1]. |
 | Piso das variáveis | Define o menor valor admitido nas evidências usadas pelo modelo estático. | Valor configurado na ferramenta estática. | Formulação do projeto [P1]. |
 | Teto fixo | Permite atribuir um nível de capacidade escolhido pelo usuário. | Opção da ferramenta estática; o README de origem menciona o valor 0,70 usado em versão anterior. | Documentação do projeto [P1]. |
+
+**Origem dos padrões de `r₀` e da escala de contágio (0.4.0).** Vêm da calibração em lote (`tools/calibrar_noite.py`) contra o garimpo do MapBiomas na APA do Tapajós, em grade de 150 m, com o K final da dissertação, em dois períodos: 2020–2022 e 2022–2024.
+
+- **Escala de contágio:** 100 m foi a melhor escala nos dois períodos e nos dois modos (previsão e reconstrução), em ordem estrita: 100 > 150 > 200 > 380 m. Em previsão, a AUC foi de 0,920 e 0,879 a 100 m, contra 0,860 e 0,825 a 380 m. 100 m foi o menor valor testado e fica abaixo do pixel de 150 m: a conclusão é "contágio de curto alcance, no limite da resolução", não 100 m exatos.
+- **`r₀`:** é o valor que iguala a área nova prevista à observada em 2020–2022 (0,000656). Em 2022–2024, o valor calibrado foi 0,000244: o ritmo da expansão caiu 2,7 vezes, e `r₀` não se transfere entre períodos. O padrão anterior, 0,004, superestimava a área nova de 11 a 33 vezes.
+- **Fiscalização:** o fatorial de platô, alcance e `F_max` não mudou nenhuma métrica do mapa da APA; os padrões ficam como estão.
+
+A janela de ocupação do modelo estático continua em 380 m: é a escala em que o K da dissertação foi calibrado, e mudá-la mudaria K.
+
+`tools/calibrar_noite.py` continua montando os planos a partir dos padrões anteriores (`BASE_PLANO`: 0,004 e 380 m), para que as rodadas já feitas sigam retomáveis e comparáveis.
 
 Os valores da fiscalização vêm do artigo [P3]:
 
@@ -227,7 +237,7 @@ O símbolo `h` representa o passo de integração, em dias nesta convenção; `�
 
 ### Propagação e eventos
 
-O contágio utiliza distância euclidiana e uma escala local próxima de 380 m. A sub-bacia recebe os resultados agregados após a simulação. Esse arranjo conserva a resolução espacial dos processos durante o cálculo.
+O contágio utiliza distância euclidiana e uma escala local de ~100 m (ver "Origem dos padrões"). A sub-bacia recebe os resultados agregados após a simulação. Esse arranjo conserva a resolução espacial dos processos durante o cálculo.
 
 Quando `C(μ) = 0`, a taxa de expansão calculada pela equação é zero. A opção de **semeadura por alertas** introduz ocupação a partir de detecções de garimpo novo, conforme a configuração do projeto.
 

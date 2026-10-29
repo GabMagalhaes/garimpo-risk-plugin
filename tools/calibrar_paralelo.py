@@ -270,7 +270,7 @@ def principal(n):
         os.remove(parar)
         log("PARAR.txt de uma rodada anterior removido.")
     model = ns["_plugin"]()[1]
-    padrao = model.Parametros()
+    padrao = ns["parametros_base"](model)
     limite = time.time() + cfg["HORAS_MAXIMAS"] * 3600
     log("=== calibrar_paralelo: %d processos, para até %s ==="
         % (n, _dt.datetime.fromtimestamp(limite).strftime("%d/%m %H:%M")))

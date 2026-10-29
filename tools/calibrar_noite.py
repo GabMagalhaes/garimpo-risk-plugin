@@ -107,7 +107,12 @@ CONFIG = dict(
     CONFIGURACOES_EXTRAS=[],
 )
 
-# faixas exploradas (edite à vontade; o padrão do plugin está em Parametros)
+# faixas exploradas (edite à vontade)
+# base dos planos: os padrões do plugin até a 0.3.7 (r0 0,004, contágio
+# 380 m). Ficam fixos aqui para que os planos — e os ids das simulações —
+# não mudem com os padrões calibrados da 0.4.0 (0,0007 e 100 m): as rodadas
+# já feitas continuam retomáveis e comparáveis
+BASE_PLANO = dict(r0=0.004, escala_contagio_m=380.0)
 # 1º calibra-se r0 para a área nova prevista bater com a observada; as etapas
 # seguintes usam esse r0 — senão, com tudo subestimado, o critério premiaria
 # a fiscalização mais fraca só por deixar crescer mais
@@ -159,6 +164,11 @@ COLUNAS = ["id", "etapa", "modo", "r0", "alerta_peso", "alerta_escala_m",
 PARAMETROS_CSV = COLUNAS[3:14]
 
 _CONTEXTO = {}
+
+
+def parametros_base(model):
+    """Parâmetros da base dos planos (BASE_PLANO), não os padrões do plugin."""
+    return model.Parametros(**BASE_PLANO)
 
 
 # =========================================================================
@@ -441,11 +451,11 @@ def verificar():
     _CONTEXTO.update(ctx)
 
     _linhas_de_base(ctx)
-    padrao = model.Parametros()
+    padrao = parametros_base(model)
     plano = (_plano_inicial(padrao)
              + _plano_restante(padrao, r0_calibrado(padrao.r0)))
     feitos = _ids_feitos()
-    _log("simulação de teste com os parâmetros padrão do plugin…")
+    _log("simulação de teste com a base dos planos (padrão até a 0.3.7)…")
     linha = _rodar_uma(ctx, plano[0])
     if linha["erro"]:
         raise RuntimeError("a simulação de teste falhou:\n" + linha["erro"])
@@ -745,7 +755,7 @@ def rodar_noite():
     if _CONTEXTO.get("assinatura") != _assinatura_config():
         verificar()
     ctx = _CONTEXTO
-    padrao = ctx["model"].Parametros()
+    padrao = parametros_base(ctx["model"])
     limite = time.time() + CONFIG["HORAS_MAXIMAS"] * 3600
     _log("=== rodar_noite(): para até %s ==="
          % _dt.datetime.fromtimestamp(limite).strftime("%d/%m %H:%M"))
@@ -879,7 +889,7 @@ def resumir(imprimir=True):
              "calibrado." % r0_calibrado())
     bases = [l for l in ok if l["etapa"] == "linha_de_base"]
     padrao = [l for l in ok if l["etapa"] in ("padrao", "calibrado")]
-    tabela("1) LINHAS DE BASE × MODELO (padrão do plugin e com r0 calibrado; "
+    tabela("1) LINHAS DE BASE × MODELO (padrão do plugin até a 0.3.7 e com r0 calibrado; "
            "o modelo precisa superar as linhas de base)", bases + padrao,
            "auc", n=20)
     for modo in ("reconstrucao", "previsao"):

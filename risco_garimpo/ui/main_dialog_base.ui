@@ -95,7 +95,7 @@
 <item row="2" column="0" colspan="2">
 <widget class="QCheckBox" name="checkResolucao">
 <property name="text"><string>Reamostrar a resolução de trabalho</string></property>
-<property name="toolTip"><string>Resoluções mais grossas aceleram e reduzem memória, ao custo de resolver pior a escala de 380 m.</string></property>
+<property name="toolTip"><string>Resoluções mais grossas aceleram e reduzem memória, ao custo de resolver pior a escala de contágio (~100 m).</string></property>
 <property name="checked"><bool>false</bool></property>
 </widget>
 </item>
@@ -353,17 +353,17 @@
 <widget class="QLabel" name="lbl_spinR0">
 <property name="text"><string>r₀ — taxa intrínseca</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre.</string></property>
+<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre. Padrão calibrado em 2020–2022 na APA do Tapajós (em 2022–2024, 0,00024): recalibre para o período.</string></property>
 </widget>
 </item>
 <item row="0" column="1">
 <widget class="QDoubleSpinBox" name="spinR0">
-<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre.</string></property>
+<property name="toolTip"><string>Crescimento por dia sob contágio pleno e capacidade livre. Padrão calibrado em 2020–2022 na APA do Tapajós (em 2022–2024, 0,00024): recalibre para o período.</string></property>
 <property name="decimals"><number>5</number></property>
 <property name="minimum"><double>0.0</double></property>
 <property name="maximum"><double>1.0</double></property>
-<property name="singleStep"><double>0.001</double></property>
-<property name="value"><double>0.004</double></property>
+<property name="singleStep"><double>0.0001</double></property>
+<property name="value"><double>0.0007</double></property>
 <property name="suffix"><string> dia⁻¹</string></property>
 </widget>
 </item>
@@ -371,17 +371,17 @@
 <widget class="QLabel" name="lbl_spinEscalaContagio">
 <property name="text"><string>Escala de contágio</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Distância característica da propagação local (estimada em ~380 m).</string></property>
+<property name="toolTip"><string>Distância característica da propagação local. Padrão calibrado na APA do Tapajós (100 m, o menor valor testado numa grade de 150 m).</string></property>
 </widget>
 </item>
 <item row="1" column="1">
 <widget class="QDoubleSpinBox" name="spinEscalaContagio">
-<property name="toolTip"><string>Distância característica da propagação local (estimada em ~380 m).</string></property>
+<property name="toolTip"><string>Distância característica da propagação local. Padrão calibrado na APA do Tapajós (100 m, o menor valor testado numa grade de 150 m).</string></property>
 <property name="decimals"><number>0</number></property>
 <property name="minimum"><double>10.0</double></property>
 <property name="maximum"><double>20000.0</double></property>
 <property name="singleStep"><double>50.0</double></property>
-<property name="value"><double>380.0</double></property>
+<property name="value"><double>100.0</double></property>
 <property name="suffix"><string> m</string></property>
 </widget>
 </item>
