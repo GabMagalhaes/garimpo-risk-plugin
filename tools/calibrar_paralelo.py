@@ -15,6 +15,9 @@ COMO USAR
 
        python-qgis-ltr "C:\\caminho\\calibrar_paralelo.py" 12
 
+   (no QGIS 4, ``python-qgis`` em vez de ``python-qgis-ltr``). O plugin
+   é procurado no perfil do QGIS que roda o script (QGIS3 ou QGIS4).
+
    O número no fim é a quantidade de processos (padrão 12). Um terceiro
    argumento troca o arquivo de CONFIG (o padrão é o calibrar_noite.py da
    mesma pasta), para manter uma cópia por período:
@@ -59,9 +62,9 @@ PASTA = os.path.dirname(os.path.abspath(__file__))
 # o calibrar_noite.py (com o CONFIG) que este processo usa; o principal o
 # troca pelo 2º argumento e o repassa aos trabalhadores
 SCRIPT = os.path.join(PASTA, "calibrar_noite.py")
-# onde o QGIS instala os plugins (o Risco Garimpo está aqui)
-PLUGINS = os.path.join(os.environ.get("APPDATA", ""), "QGIS", "QGIS3",
-                       "profiles", "default", "python", "plugins")
+# onde o QGIS instala os plugins (o Risco Garimpo está aqui): o perfil
+# do QGIS que roda o script, QGIS3 ou QGIS4 (ver _pastas_de_plugins)
+PERFIS = os.path.join(os.environ.get("APPDATA", ""), "QGIS")
 
 # processos que preparam os dados ao mesmo tempo (o pico de memória)
 PREPARANDO_JUNTOS = 2
@@ -80,11 +83,35 @@ _ERRO_PREPARO = ""   # se a preparação de um trabalhador falhar
 def _iniciar_qgis():
     """QGIS sem interface: necessário para abrir as camadas (provedor ogr)."""
     global _APP
-    if PLUGINS not in sys.path:
-        sys.path.insert(0, PLUGINS)
+    for pasta in reversed(_pastas_de_plugins()):
+        if pasta not in sys.path:
+            sys.path.insert(0, pasta)
     from qgis.core import QgsApplication
     _APP = QgsApplication([], False)
     _APP.initQgis()
+
+
+def _pastas_de_plugins():
+    """Pastas de plugins a procurar, a do QGIS em uso primeiro.
+
+    O QGIS 4 instala os plugins em ``QGIS4``; o 3, em ``QGIS3``. Com os
+    dois instalados, cada perfil pode ter uma versão diferente do plugin.
+    """
+    from qgis.core import Qgis
+    atual = "QGIS%d" % (Qgis.QGIS_VERSION_INT // 10000)
+    perfis = [atual] + [p for p in ("QGIS4", "QGIS3") if p != atual]
+    return [os.path.join(PERFIS, p, "profiles", "default", "python",
+                         "plugins") for p in perfis]
+
+
+def _versoes(model):
+    """QGIS em uso e plugin carregado: a rodada deve usar o plugin atual."""
+    from qgis.core import Qgis
+    from risco_garimpo.core import registro
+    return ("QGIS %s; plugin Risco Garimpo %s em %s"
+            % (Qgis.QGIS_VERSION, registro.versao_plugin(),
+               os.path.dirname(os.path.dirname(os.path.dirname(
+                   os.path.abspath(model.__file__))))))
 
 
 def _carregar():
@@ -247,6 +274,7 @@ def principal(n):
     limite = time.time() + cfg["HORAS_MAXIMAS"] * 3600
     log("=== calibrar_paralelo: %d processos, para até %s ==="
         % (n, _dt.datetime.fromtimestamp(limite).strftime("%d/%m %H:%M")))
+    log(_versoes(model))
     log("Preparando os dados em cada processo, %d de cada vez (alguns "
         "minutos antes da 1ª linha)…" % PREPARANDO_JUNTOS)
     ns["_impedir_suspensao"](True)

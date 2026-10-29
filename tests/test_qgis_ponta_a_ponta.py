@@ -164,6 +164,10 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
     assert not [l for l in linhas if l["erro"]]
     assert any(l["k_fator"] == "100" for l in linhas)
     assert os.path.isfile(os.path.join(saida, "resumo.txt"))
+    # o log diz que QGIS e que plugin a rodada usou
+    from risco_garimpo.core import registro
+    log = open(os.path.join(saida, "calibracao.log"), encoding="utf-8").read()
+    assert "plugin Risco Garimpo %s em " % registro.versao_plugin() in log
 
 
 def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
