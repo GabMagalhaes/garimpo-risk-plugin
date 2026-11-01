@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Registro do plugin no QGIS: três ferramentas, um menu.
+"""Registro do plugin no QGIS: quatro ferramentas, um menu.
 
 A separação entre elas é de arquivo, não de chamada: o modelo estático grava
 `K.tif`; o modelo dinâmico o lê como qualquer raster. Nenhum dos dois importa
 o código do outro, e nada reprocessa o estático a cada simulação. A
-validação lê o registro e as saídas de uma execução do dinâmico.
+validação lê o registro e as saídas de uma execução do dinâmico. A
+calibração roda os dois modelos muitas vezes contra o garimpo observado e
+leva os parâmetros sugeridos aos diálogos deles.
 """
 
 import os
@@ -22,7 +24,7 @@ MENU_TITLE = "Risco Garimpo"
 
 
 class RiscoGarimpoPlugin:
-    """Modelo estático (K), modelo dinâmico (expansão) e validação."""
+    """Modelo estático (K), modelo dinâmico (expansão), validação e calibração."""
 
     def __init__(self, iface):
         self.iface = iface
@@ -30,6 +32,7 @@ class RiscoGarimpoPlugin:
         self.dialogo_dinamico = None
         self.dialogo_estatico = None
         self.dialogo_validacao = None
+        self.dialogo_calibracao = None
 
     # ------------------------------------------------------------------ QGIS
     def _icone(self):
@@ -64,6 +67,12 @@ class RiscoGarimpoPlugin:
             "Compara a expansão prevista de uma execução com o garimpo "
             "observado: AUC, curva de captura, linhas de base e sub-bacias.",
             "riscoGarimpoValidacaoAction", self.abrir_validacao, barra=False)
+        self._acao(
+            "Calibrar os modelos…",
+            "Roda os modelos muitas vezes contra o garimpo observado e sugere "
+            "os parâmetros: pesos e γ do estático, r₀ e contágio do dinâmico.",
+            "riscoGarimpoCalibracaoAction", self.abrir_calibracao,
+            barra=False)
 
     def unload(self):
         for acao, barra in self.acoes:
@@ -72,7 +81,7 @@ class RiscoGarimpoPlugin:
                 self.iface.removeToolBarIcon(acao)
         self.acoes = []
         for atributo in ("dialogo_dinamico", "dialogo_estatico",
-                         "dialogo_validacao"):
+                         "dialogo_validacao", "dialogo_calibracao"):
             dialogo = getattr(self, atributo)
             if dialogo is not None:
                 dialogo.close()
@@ -109,6 +118,23 @@ class RiscoGarimpoPlugin:
             self.dialogo_validacao = ValidacaoDialog(
                 self.iface, self.iface.mainWindow())
         self._mostrar(self.dialogo_validacao)
+
+    def abrir_calibracao(self):
+        from .ui.calibracao_dialog import CalibracaoDialog
+
+        if self.dialogo_calibracao is None:
+            self.dialogo_calibracao = CalibracaoDialog(
+                self.iface, self.iface.mainWindow(),
+                aplicar=self.aplicar_sugestao)
+        self._mostrar(self.dialogo_calibracao)
+
+    def aplicar_sugestao(self, modelo, sugestao):
+        """Abre o diálogo do modelo e leva a ele os valores sugeridos."""
+        if modelo == "estatico":
+            self.abrir_estatico()
+            return self.dialogo_estatico.aplicar_sugestao(sugestao)
+        self.abrir_dinamico()
+        return self.dialogo_dinamico.aplicar_sugestao(sugestao)
 
     # --------------------------------------------------------- compatibilidade
     def run(self):

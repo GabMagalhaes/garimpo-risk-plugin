@@ -1,12 +1,13 @@
 # Risco Garimpo — plugin QGIS
 
-Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza três ferramentas no menu **Raster → Risco Garimpo**:
+Plugin desenvolvido no âmbito da dissertação sobre a expansão do garimpo ilegal na Província Mineral do Tapajós. Disponibiliza quatro ferramentas no menu **Raster → Risco Garimpo**:
 
 | Ferramenta | Função | Produto principal |
 |---|---|---|
 | **Modelo estático — gerar K** | Estimar a capacidade de ocupação por garimpo a partir das condições do terreno e de uma calibração com dados observados. | Raster `K.tif`, com a fração máxima estimada de ocupação de cada pixel. |
 | **Modelo dinâmico de risco** | Simular a expansão no período escolhido, considerando ocupação inicial, contágio, alertas e fiscalização. | Raster de expansão `Δμ`, correspondente ao acréscimo de ocupação simulado. |
 | **Validar uma execução** | Comparar a expansão prevista por uma execução do modelo dinâmico com o garimpo novo observado, e com alternativas sem dinâmica. | Tabela de métricas, curva de captura e comparação por sub-bacia. |
+| **Calibrar os modelos** | Rodar os dois modelos muitas vezes contra o garimpo observado e sugerir os parâmetros: pesos e γ do estático; `r₀` e escala de contágio do dinâmico. Serve para reaplicar o método em outra área, período ou mapeamento do garimpo. | `resumo.txt`, `resultados.csv` e `sugestao.json`; o botão "Usar sugestão" leva os valores ao diálogo do modelo. |
 
 O modelo estático grava a capacidade estimada em arquivo. O modelo dinâmico recebe esse raster como insumo e o mantém fixo durante a simulação. Também pode receber um raster de capacidade produzido por outro procedimento, desde que compatível com a ocupação inicial. A validação lê o registro e as saídas de uma execução do modelo dinâmico.
 
@@ -72,7 +73,7 @@ Confira o tamanho da **Grade resultante** e a memória estimada por camada antes
 | Piso das variáveis | Define o menor valor admitido nas evidências usadas pelo modelo estático. | Valor configurado na ferramenta estática. | Formulação do projeto [P1]. |
 | Teto fixo | Permite atribuir um nível de capacidade escolhido pelo usuário. | Opção da ferramenta estática; o README de origem menciona o valor 0,70 usado em versão anterior. | Documentação do projeto [P1]. |
 
-**Origem dos padrões de `r₀` e da escala de contágio (0.4.0).** Vêm da calibração em lote (`tools/calibrar_noite.py`) contra o garimpo do MapBiomas na APA do Tapajós, em grade de 150 m, com o K final da dissertação, em dois períodos: 2020–2022 e 2022–2024.
+**Origem dos padrões de `r₀` e da escala de contágio (0.4.0).** Vêm da calibração do modelo dinâmico (hoje a janela **Calibrar os modelos**; na época, `tools/calibrar_noite.py`, com o mesmo plano) contra o garimpo do MapBiomas na APA do Tapajós, em grade de 150 m, com o K final da dissertação, em dois períodos: 2020–2022 e 2022–2024.
 
 - **Escala de contágio:** 100 m foi a melhor escala nos dois períodos e nos dois modos (previsão e reconstrução), em ordem estrita: 100 > 150 > 200 > 380 m. Em previsão, a AUC foi de 0,920 e 0,879 a 100 m, contra 0,860 e 0,825 a 380 m. 100 m foi o menor valor testado e fica abaixo do pixel de 150 m: a conclusão é "contágio de curto alcance, no limite da resolução", não 100 m exatos.
 - **`r₀`:** é o valor que iguala a área nova prevista à observada em 2020–2022 (0,000656). Em 2022–2024, o valor calibrado foi 0,000244: o ritmo da expansão caiu 2,7 vezes, e `r₀` não se transfere entre períodos. O padrão anterior, 0,004, superestimava a área nova de 11 a 33 vezes.
@@ -80,7 +81,7 @@ Confira o tamanho da **Grade resultante** e a memória estimada por camada antes
 
 A janela de ocupação do modelo estático continua em 380 m: é a escala em que o K da dissertação foi calibrado, e mudá-la mudaria K.
 
-`tools/calibrar_noite.py` continua montando os planos a partir dos padrões anteriores (`BASE_PLANO`: 0,004 e 380 m), para que as rodadas já feitas sigam retomáveis e comparáveis.
+A calibração continua montando os planos a partir dos padrões anteriores (`BASE_PLANO` em `core/calibracao_dinamica.py`: 0,004 e 380 m), para que as rodadas já feitas sigam retomáveis e comparáveis.
 
 Os valores da fiscalização vêm do artigo [P3]:
 
@@ -334,10 +335,21 @@ O registro descreve os arquivos listados em `saidas`. Antes da primeira saída, 
 - **Intensidade dos efeitos:** ajuste `r₀`, `α` e `F_max` com dados observados. A forma das funções temporais e espaciais constitui uma parte da parametrização.
 - **Memória:** muitas janelas em rasters extensos aumentam a demanda. Avalie a resolução e o número de janelas em conjunto com as escalas dos processos.
 - **Validação temporal:** compare a expansão prevista com o garimpo novo observado em período reservado para teste [P1, P2]. A ferramenta **Validar uma execução** faz essa comparação; as métricas e o procedimento estão descritos abaixo.
-- **Calibração em lote:** `tools/calibrar_noite.py` roda, no Console Python do QGIS, centenas de simulações entre duas datas com mapas de garimpo e compara a expansão prevista com a observada. Primeiro calibra `r₀` para a área nova prevista igualar a observada; depois varia os demais parâmetros, com um fatorial de platô, alcance e `F_max` da fiscalização, e compara o modelo com alternativas sem dinâmica (só `K`, remanescente, proximidade ao garimpo existente). Grava cada simulação num CSV assim que termina, retoma de onde parou e escreve `resumo.txt`. `tools/calibrar_paralelo.py` roda o mesmo plano em vários processos, fora do QGIS. `fora_da_amostra(treino, teste)` compara dois períodos rodados com o mesmo plano: escolhe os parâmetros num período e mede o desempenho no outro, sem simular de novo. As instruções estão no início de cada arquivo.
 - **K acrescenta informação?** `tools/experimento_k.py` compara, em cada período e em recortes pela distância ao garimpo de `t₀` (geral, até 1 km, 1–5 km, mais de 5 km), a proximidade ao garimpo existente `P` com `S = P × máx(K − O₀, 0)` para o K atual, o K sem Est e K = 1. O K sem Est é gerado pelo modelo estático com a mesma configuração do registro do K atual, sem Est; antes, o K atual é regerado e conferido contra o arquivo. `O₀` é a ocupação na janela de ocupação, o mesmo suporte em que K é calibrado, e `P` é calculado por soma direta, sem o ruído da FFT, de modo que é zero fora do alcance do núcleo: onde `P = 0` em todo o recorte, a comparação é registrada como redundante. Mede captura nos 1, 5 e 10% da área, AUC e `r_blocos`, com intervalos de 95% das diferenças por bootstrap pareado por sub-bacia, e reproduz as linhas de base da calibração do mesmo período. Roda em modo `piloto` (um período, poucas réplicas) e `completo`; o segundo reaproveita o K sem Est e a conferência do primeiro.
 
 A documentação cita o teste `test_supressao_temporaria_desloca_a_trajetoria_permanentemente`. Ele examina, em um cenário sintético, a persistência de diferenças de trajetória após a fiscalização perder intensidade. A duração e a magnitude dessas diferenças dependem dos parâmetros, da saturação e do horizonte analisado. A interpretação territorial exige comparação com dados observados.
+
+### Calibrar os modelos
+
+**Raster → Risco Garimpo → Calibrar os modelos…** roda, em segundo plano e com o QGIS usável, a calibração de cada modelo contra o garimpo observado entre duas datas. É feita para rodar sozinha por horas (uma noite): cada combinação vai para `resultados.csv` assim que termina; rodar de novo na mesma pasta retoma de onde parou; Cancelar, ou um arquivo `PARAR.txt` na pasta, para com segurança. Cada pasta guarda uma calibração só: com outros dados, a janela pede uma pasta nova (`configuracao.json`). No fim, `resumo.txt` começa pela sugestão, `sugestao.json` a guarda, e **Usar sugestão** abre o diálogo do modelo com os valores sugeridos.
+
+**Modelo estático (pesos e γ).** Para cada combinação de pesos das evidências (PGgeom, Est e Lt, em passos de 0,1, inclusive as que zeram uma ou duas delas) e de γ (0,2 a 0,9), gera K numa grade grossa (150 m) **só com o garimpo da data inicial** — o nível sai dos dados, como no modelo estático, com o piso, a janela e o quantil fixos — e mede o garimpo novo até a data final no topo de `S = P × máx(K − O₀, 0)`, a avaliação do experimento K. Com três evidências são 507 combinações, mais três referências: `P` sozinho, `K = 1` e o K com os pesos atuais. Na Província, a 150 m, cada combinação leva 1–2 s. **Regra de escolha:** entre as combinações a menos de 1 ponto percentual da melhor captura nos 5%, sugere a de menos evidências; no empate, a de maior captura. O resumo traz também, para cada evidência, a melhor captura com ela e sem ela, e a melhor por γ. O K definitivo se gera depois, na resolução final e com o mapa mais recente, pelo diálogo do modelo estático.
+
+**Modelo dinâmico (`r₀` e contágio).** O plano da calibração noturna: o padrão, a varredura de `r₀` (calibrado para a área nova prevista igualar a observada), as linhas de base sem dinâmica (só `K`, remanescente, proximidade e proximidade × remanescente em 100–500 m), sensibilidade, o fatorial de platô, alcance e `F_max` da fiscalização, a etapa estrutura (escala de contágio × fator de `K`) e combinações aleatórias — cerca de 505 simulações; a 150 m na Província, uma noite. **Sugestão:** o `r₀` calibrado e a escala de contágio da simulação de maior captura nos 5% no modo previsão (só eventos até a data inicial), com `K` sem fator e os demais parâmetros na base do plano; o resumo diz se o modelo supera a melhor linha de base e se um `K` mais frouxo ajustaria melhor. **Fora da amostra:** com uma calibração de outro período (mesma semente e número de aleatórias), escolhe os parâmetros num período e mede no outro, sem simular nada (`fora_da_amostra.txt`).
+
+As duas sugestões valem para o período e os dados usados: o ritmo da expansão muda entre períodos (`r₀` caiu 2,7 vezes entre 2020–2022 e 2022–2024 na APA do Tapajós) e deve ser recalibrado. A avaliação é retrospectiva; diferenças menores que a tolerância não distinguem combinações. Rotinas: `core/calibracao_estatica.py` e `core/calibracao_dinamica.py`.
+
+**Em paralelo, para computadores de alto desempenho (só no repositório).** `tools/calibrar_paralelo.py` roda a calibração do modelo dinâmico em vários processos, fora do QGIS, com o mesmo motor, o mesmo plano e a mesma pasta da janela — uma rodada começada num continua no outro. Não faz parte do plugin instalado. Preencha o CONFIG de `tools/calibrar_noite.py` (que também roda pelo Console Python) e chame, no OSGeo4W Shell ou no Python que enxerga o módulo `qgis`, `python-qgis calibrar_paralelo.py 12` (12 processos); num servidor sem perfil do QGIS, aponte a pasta do plugin em `RISCO_GARIMPO_PLUGINS`. As instruções estão no início de cada arquivo. A calibração do modelo estático não precisa disso: leva minutos.
 
 ### Métricas de validação
 
@@ -394,16 +406,18 @@ Para que a comparação tenha sentido, o modelo precisa superar alternativas sem
 | `core/registro.py` | Registro da execução em JSON: configuração, identificação dos insumos e saídas. |
 | `core/validacao.py` | Métricas de validação da expansão prevista contra o garimpo novo observado. |
 | `core/execucao_validacao.py` | Orquestração da validação de uma execução: leitura alinhada, métricas, linhas de base, curva de captura, sub-bacias e registro. |
+| `core/calibracao_estatica.py` | Calibração do modelo estático: grade de pesos e γ, avaliação por `P × máx(K − O₀, 0)` e sugestão. |
+| `core/calibracao_dinamica.py` | Calibração do modelo dinâmico: plano, simulações, CSV retomável, resumo, sugestão e teste fora da amostra. Usado também por `tools/calibrar_noite.py` e `tools/calibrar_paralelo.py`. |
 | `compat.py` | Diferenças entre o QGIS 3 (Qt5) e o QGIS 4 (Qt6): nomes de enum com escopo, tipos de geometria e de campo. |
 | `ui/` | Diálogos, arquivos `.ui` e tarefas do QGIS. |
-| `tools/` | Geração de interfaces, empacotamento e dados de teste. |
+| `tools/` | Geração de interfaces, empacotamento, dados de teste, a calibração pelo console e em paralelo (`calibrar_noite.py`, `calibrar_paralelo.py`) e o experimento K. Não vão no ZIP do plugin. |
 | `tests/` | Testes do núcleo e contratos de interface. |
 
 Os caminhos do núcleo são relativos à pasta `risco_garimpo/`. As responsabilidades acima seguem a documentação original [P1].
 
 Cada ferramenta organiza o trabalho em três fases: **preparar**, na thread principal, acessa as camadas do projeto; **executar**, em segundo plano, realiza os cálculos; **agregar/escrever**, na thread principal, finaliza as saídas.
 
-A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu, e um terceiro o QGIS 4.2 do conda-forge; os dois rodam também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais e abre o plugin e os três diálogos; fora desses ambientes, esse teste é pulado.
+A cada push, o GitHub Actions (`.github/workflows/testes.yml`) roda os testes em Python 3.9, a versão do QGIS 3.22, e em 3.12, com e sem SciPy. Um segundo job instala o QGIS 3.34 do Ubuntu, e um terceiro o QGIS 4.2 do conda-forge; os dois rodam também `tests/test_qgis_ponta_a_ponta.py`, que executa os dois modelos com a GDAL e a API vetorial do QGIS reais e abre o plugin e os quatro diálogos, inclusive as duas calibrações até a sugestão chegar aos diálogos dos modelos; fora desses ambientes, esse teste é pulado.
 
 O arquivo `tests/test_contrato_ui.py` verifica os componentes utilizados pelos diálogos e a correspondência entre os arquivos de interface e seus geradores.
 
@@ -412,6 +426,8 @@ pip install -r requirements-dev.txt
 python -m pytest tests -q
 python tools/gerar_ui.py
 python tools/gerar_ui_estatico.py
+python tools/gerar_ui_validacao.py
+python tools/gerar_ui_calibracao.py
 python tools/empacotar.py
 ```
 

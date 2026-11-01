@@ -462,6 +462,23 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
         return {nome: getattr(self, nome) for nome in nomes
                 if hasattr(self, nome)}
 
+    # ------------------------------------------------------------- calibração
+    def aplicar_sugestao(self, sugestao):
+        """Parâmetros sugeridos pela calibração; devolve o que mudou."""
+        parametros = sugestao.get("parametros", {})
+        alteracoes = []
+        for chave, nome in WIDGETS_DA_CALIBRACAO:
+            if chave not in parametros:
+                continue
+            widget = getattr(self, nome)
+            antes = _valor_widget(widget)
+            _definir_widget(widget, parametros[chave])
+            depois = _valor_widget(widget)
+            if depois != antes:
+                alteracoes.append("%s: %s → %s" % (chave, _formatar(antes),
+                                                   _formatar(depois)))
+        return alteracoes or ["nenhuma: os valores já eram os sugeridos"]
+
     # -------------------------------------------------------------- utilidades
     def _registrar(self, mensagem):
         self.textoLog.appendPlainText(str(mensagem))
@@ -484,6 +501,16 @@ class RiscoGarimpoDialog(QDialog, FORM_CLASS):
 
 
 # ------------------------------------------------------------------ auxiliares
+# parâmetro sugerido pela calibração → widget do diálogo
+WIDGETS_DA_CALIBRACAO = (
+    ("r0", "spinR0"), ("escala_contagio_m", "spinEscalaContagio"),
+    ("alerta_peso", "spinAlertaPeso"), ("alerta_escala_m", "spinAlertaEscala"),
+    ("alerta_tau_dias", "spinAlertaTau"), ("alerta_semeia", "checkSemeia"),
+    ("fisc_max", "spinFiscMax"), ("fisc_escala_m", "spinFiscEscala"),
+    ("fisc_plato_dias", "spinFiscPlato"), ("fisc_k_queda", "spinFiscQueda"),
+    ("passo_dias", "spinPasso"))
+
+
 def _botao(nome):
     return compat.membro(QMessageBox, "StandardButton", nome)
 

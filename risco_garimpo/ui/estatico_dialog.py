@@ -271,6 +271,23 @@ class EstaticoDialog(QDialog, FORM_CLASS):
         self.lblStatus.setText(status)
         self.tarefa = None
 
+    def aplicar_sugestao(self, sugestao):
+        """Pesos e γ sugeridos pela calibração; devolve o que mudou."""
+        alteracoes = []
+        for nome, spin in (("PGgeom", self.spinPesoIBx),
+                           ("Est", self.spinPesoEst),
+                           ("Lt", self.spinPesoLito)):
+            if nome in sugestao.get("pesos", {}):
+                spin.setValue(float(sugestao["pesos"][nome]))
+                alteracoes.append("peso de %s = %g" % (nome, spin.value()))
+        if sugestao.get("gama") is not None:
+            self.spinGamma.setValue(float(sugestao["gama"]))
+            alteracoes.append("γ = %g" % self.spinGamma.value())
+        else:
+            alteracoes.append("γ mantido (com uma evidência não faz "
+                              "diferença)")
+        return alteracoes
+
     def showEvent(self, evento):  # noqa: N802 - Qt
         super().showEvent(evento)
         self.recarregar()

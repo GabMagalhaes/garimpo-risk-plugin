@@ -9,16 +9,19 @@ partir da mesma lista — a lista concordava consigo mesma. Aqui a verificação
 
 import ast
 import os
+import sys
 import xml.etree.ElementTree as ET
 
 import pytest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UI = os.path.join(RAIZ, "risco_garimpo", "ui")
+sys.path.insert(0, RAIZ)
 
 PARES = [("estatico_dialog.py", "estatico_dialog_base.ui"),
          ("main_dialog.py", "main_dialog_base.ui"),
-         ("validacao_dialog.py", "validacao_dialog_base.ui")]
+         ("validacao_dialog.py", "validacao_dialog_base.ui"),
+         ("calibracao_dialog.py", "calibracao_dialog_base.ui")]
 
 # atributos do próprio QDialog ou definidos no __init__ do diálogo
 HERDADOS = {
@@ -138,11 +141,40 @@ def test_o_gerador_reproduz_o_ui_da_validacao():
     assert gerar_ui_validacao.construir() == atual
 
 
-def test_o_plugin_registra_as_tres_ferramentas():
+def test_o_plugin_registra_as_quatro_ferramentas():
     fonte = open(os.path.join(RAIZ, "risco_garimpo", "plugin.py"),
                  encoding="utf-8").read()
     arvore = ast.parse(fonte)
     metodos = {no.name for no in ast.walk(arvore)
                if isinstance(no, ast.FunctionDef)}
-    assert {"abrir_estatico", "abrir_dinamico", "abrir_validacao"} <= metodos
+    assert {"abrir_estatico", "abrir_dinamico", "abrir_validacao",
+            "abrir_calibracao", "aplicar_sugestao"} <= metodos
     assert "ui.validacao_dialog" in fonte
+    assert "ui.calibracao_dialog" in fonte
+
+
+def test_o_gerador_reproduz_o_ui_da_calibracao():
+    import sys
+    sys.path.insert(0, os.path.join(RAIZ, "tools"))
+    import gerar_ui_calibracao
+
+    atual = open(os.path.join(UI, "calibracao_dialog_base.ui"),
+                 encoding="utf-8").read()
+    assert gerar_ui_calibracao.construir() == atual
+
+
+def test_a_sugestao_dinamica_tem_widget_para_cada_parametro():
+    """Cada parâmetro que a calibração sugere chega a um widget do diálogo."""
+    from risco_garimpo.core.calibracao_dinamica import PARAMETROS_CSV
+    nomes = _widgets_do_ui(os.path.join(UI, "main_dialog_base.ui"))
+    fonte = open(os.path.join(UI, "main_dialog.py"), encoding="utf-8").read()
+    arvore = ast.parse(fonte)
+    pares = None
+    for no in ast.walk(arvore):
+        if isinstance(no, ast.Assign) and any(
+                getattr(t, "id", None) == "WIDGETS_DA_CALIBRACAO"
+                for t in no.targets):
+            pares = ast.literal_eval(no.value)
+    assert pares is not None
+    assert {c for c, _w in pares} == set(PARAMETROS_CSV)
+    assert all(w in nomes for _c, w in pares)

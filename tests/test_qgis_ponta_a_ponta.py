@@ -109,12 +109,14 @@ def test_calibracao_da_noite_roda_retoma_e_resume(qgis, tmp_path,
     espaco["rodar_noite"]()
     with open(os.path.join(pasta, "resultados.csv"), encoding="utf-8") as f:
         primeira = f.read()
-    espaco["_CONTEXTO"].clear()
+    espaco["_MOTOR"].clear()                      # uma sessão nova do console
     espaco["rodar_noite"]()                       # retomada: nada a refazer
     with open(os.path.join(pasta, "resultados.csv"), encoding="utf-8") as f:
         assert f.read() == primeira
     resumo = open(os.path.join(pasta, "resumo.txt"), encoding="utf-8").read()
     assert "LINHAS DE BASE" in resumo and "PLATÔ" in resumo
+    assert "0) SUGESTÃO" in resumo
+    assert os.path.isfile(os.path.join(pasta, "sugestao.json"))
     assert "erro" not in primeira.split("\n", 1)[1].lower()
 
 
@@ -164,6 +166,7 @@ def test_calibracao_paralela_fora_do_qgis(qgis, tmp_path):
     assert not [l for l in linhas if l["erro"]]
     assert any(l["k_fator"] == "100" for l in linhas)
     assert os.path.isfile(os.path.join(saida, "resumo.txt"))
+    assert os.path.isfile(os.path.join(saida, "sugestao.json"))
     # o log diz que QGIS e que plugin a rodada usou
     from risco_garimpo.core import registro
     log = open(os.path.join(saida, "calibracao.log"), encoding="utf-8").read()
@@ -185,7 +188,7 @@ def test_dialogo_da_validacao_num_qgis_com_interface(tmp_path):
 
 
 def test_plugin_e_dialogos_dos_modelos_num_qgis_com_interface(tmp_path):
-    """Menu, diálogos do estático e do dinâmico, preferências e fechamento."""
+    """Menu, diálogos dos modelos e da calibração, preferências e fechamento."""
     import subprocess
 
     ambiente = _ambiente_do_subprocesso()
@@ -195,7 +198,8 @@ def test_plugin_e_dialogos_dos_modelos_num_qgis_com_interface(tmp_path):
     processo = subprocess.run(
         [sys.executable, os.path.join(RAIZ, "tests", "roteiro_dialogos.py"),
          str(tmp_path)],
-        env=ambiente, capture_output=True, text=True, timeout=600)
+        # as duas calibrações rodam inteiras: ~2 min numa máquina comum
+        env=ambiente, capture_output=True, text=True, timeout=1200)
     saida = processo.stdout + processo.stderr
     assert processo.returncode == 0 and "DIALOGOS_OK" in processo.stdout, saida
 

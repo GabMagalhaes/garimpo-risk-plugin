@@ -1,18 +1,22 @@
 # -*- coding: utf-8 -*-
-"""Abre o plugin e os diálogos dos dois modelos num QGIS com interface.
+"""Abre o plugin e os diálogos dos modelos e da calibração num QGIS com interface.
 
 Roda em processo próprio (tests/test_qgis_ponta_a_ponta.py o chama), como o
 roteiro da validação. Cobre o que só aparece com Qt de verdade — e que muda
 entre o QGIS 3 (Qt5) e o QGIS 4 (Qt6): o registro das ações no menu, a
 leitura dos .ui, as preferências do modelo dinâmico, a pergunta ao fechar
-com uma simulação em andamento e o estilo das saídas.
+com uma simulação em andamento, o estilo das saídas e a calibração dos dois
+modelos, até levar a sugestão aos diálogos.
 
 Uso: python roteiro_dialogos.py <pasta>
 """
 
+import json
 import os
 import sys
 import time
+
+import numpy as np
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -89,13 +93,14 @@ def _plugin(iface):
     import risco_garimpo
     plugin = risco_garimpo.classFactory(iface)
     plugin.initGui()
-    assert len(iface.menu) == 3, iface.menu
+    assert len(iface.menu) == 4, iface.menu
     assert len(iface.barra_de_ferramentas) == 2
     for _menu, acao in iface.menu:
         acao.trigger()          # abre cada diálogo pelo menu
     assert plugin.dialogo_estatico is not None
     assert plugin.dialogo_dinamico is not None
     assert plugin.dialogo_validacao is not None
+    assert plugin.dialogo_calibracao is not None
     plugin.unload()
     assert not iface.menu and not iface.barra_de_ferramentas
 
@@ -190,6 +195,129 @@ def _dinamico(iface, pasta, K, mu0, mascara, alertas, autos):
     outro.close()
 
 
+def _rasters_da_calibracao(pasta, dados):
+    """Duas evidências a mais (Est, Lt) e o garimpo da data final."""
+    from osgeo import gdal
+    fonte = gdal.Open(dados["K"])
+    K = fonte.GetRasterBand(1).ReadAsArray()
+    fonte_mu0 = gdal.Open(dados["mu0"])
+    mu0 = fonte_mu0.GetRasterBand(1).ReadAsArray()
+    rng = np.random.default_rng(5)
+    est = rng.random(K.shape)
+    for _ in range(6):
+        est = (est + np.roll(est, 1, 0) + np.roll(est, -1, 0)
+               + np.roll(est, 1, 1) + np.roll(est, -1, 1)) / 5.0
+    lt = np.sqrt(np.clip(K, 0.0, 1.0))
+    mu1 = mu0.copy()
+    for linha, coluna in ((60, 70), (130, 150), (95, 45)):
+        mu1[linha - 4:linha + 5, coluna - 4:coluna + 5] = 0.9
+    mu1 = np.maximum(np.minimum(mu1, np.maximum(K, mu0)), mu0)
+    saidas = {}
+    for nome, arr in (("Est", est), ("Lt", lt), ("mu1", mu1)):
+        caminho = os.path.join(pasta, "calib_%s.tif" % nome)
+        destino = gdal.GetDriverByName("GTiff").Create(
+            caminho, fonte.RasterXSize, fonte.RasterYSize, 1,
+            gdal.GDT_Float32)
+        destino.SetGeoTransform(fonte.GetGeoTransform())
+        destino.SetProjection(fonte.GetProjection())
+        destino.GetRasterBand(1).WriteArray(arr.astype(np.float32))
+        destino = None
+        saidas[nome] = caminho
+    return saidas
+
+
+def _calibracao(iface, pasta, camadas):
+    """A janela Calibração, do plugin: as duas abas, a sugestão e a retomada."""
+    import risco_garimpo
+    import risco_garimpo.ui.calibracao_dialog as modulo
+    erros = _sem_janelas_modais(modulo)
+    informacoes = []
+    modulo.QMessageBox.information = \
+        lambda *a, **k: informacoes.append(a[-1])
+    plugin = risco_garimpo.classFactory(iface)
+    plugin.initGui()
+    plugin.abrir_calibracao()
+    dialogo = plugin.dialogo_calibracao
+
+    # ---- modelo estático: pesos e γ
+    dialogo.abas.setCurrentWidget(dialogo.abaEstatico)
+    _selecionar(dialogo.comboCalPGgeom, camadas["K"])
+    _selecionar(dialogo.comboCalEst, camadas["Est"])
+    _selecionar(dialogo.comboCalLt, camadas["Lt"])
+    _selecionar(dialogo.comboEstMuInicial, camadas["mu0"])
+    _selecionar(dialogo.comboEstMuFinal, camadas["mu1"])
+    _selecionar(dialogo.comboEstMascara, camadas["mascara"])
+    dialogo.spinEstResolucao.setValue(100.0)
+    dialogo.spinEstMinimo.setValue(20)
+    pasta_est = os.path.join(pasta, "calibracao_estatica")
+    dialogo.linhaEstPasta.setText(pasta_est)
+    dialogo._executar()
+    assert dialogo.tarefa is not None, (dialogo.textoLog.toPlainText(), erros)
+    _esperar(dialogo)
+    log = dialogo.textoLog.toPlainText()
+    assert dialogo.lblStatus.text().startswith("Concluída"), \
+        (dialogo.lblStatus.text(), log, erros)
+    with open(os.path.join(pasta_est, "sugestao.json"),
+              encoding="utf-8") as arquivo:
+        sugestao = json.load(arquivo)
+    dialogo.abas.setCurrentWidget(dialogo.abaEstatico)
+    assert dialogo.btnSugestao.isEnabled() and dialogo.btnResumo.isEnabled()
+    dialogo._usar_sugestao()
+    assert informacoes and not erros, (informacoes, erros)
+    estatico = plugin.dialogo_estatico
+    for nome, spin in (("PGgeom", estatico.spinPesoIBx),
+                       ("Est", estatico.spinPesoEst),
+                       ("Lt", estatico.spinPesoLito)):
+        assert abs(spin.value() - sugestao["pesos"][nome]) < 1e-9, nome
+    if sugestao["gama"] is not None:
+        assert abs(estatico.spinGamma.value() - sugestao["gama"]) < 1e-9
+
+    # ---- modelo dinâmico: r₀ e escala de contágio
+    dialogo.abas.setCurrentWidget(dialogo.abaDinamico)
+    assert not dialogo.btnSugestao.isEnabled()          # pasta ainda vazia
+    _selecionar(dialogo.comboDinK, camadas["K"])
+    _selecionar(dialogo.comboDinMuInicial, camadas["mu0"])
+    _selecionar(dialogo.comboDinMuFinal, camadas["mu1"])
+    _selecionar(dialogo.comboDinMascara, camadas["mascara"])
+    _selecionar(dialogo.comboDinAlertas, camadas["alertas"])
+    _selecionar(dialogo.comboDinAutos, camadas["autos"])
+    assert dialogo.comboDinCampoAlertas.currentText() == "data"
+    dialogo.dateDinInicio.setDate(QDate(2025, 1, 1))
+    dialogo.dateDinFim.setDate(QDate(2026, 12, 31))
+    dialogo.spinDinResolucao.setValue(100.0)
+    dialogo.spinDinAleatorias.setValue(0)
+    pasta_din = os.path.join(pasta, "calibracao_dinamica")
+    dialogo.linhaDinPasta.setText(pasta_din)
+    dialogo._executar()
+    assert dialogo.tarefa is not None, (dialogo.textoLog.toPlainText(), erros)
+    _esperar(dialogo, 900)
+    log = dialogo.textoLog.toPlainText()
+    assert dialogo.lblStatus.text().startswith("Concluída"), \
+        (dialogo.lblStatus.text(), log[-3000:], erros)
+    with open(os.path.join(pasta_din, "sugestao.json"),
+              encoding="utf-8") as arquivo:
+        sugestao = json.load(arquivo)
+    dialogo.abas.setCurrentWidget(dialogo.abaDinamico)
+    dialogo._usar_sugestao()
+    dinamico = plugin.dialogo_dinamico
+    assert abs(dinamico.spinR0.value()
+               - round(sugestao["parametros"]["r0"], 5)) < 1e-9
+    assert dinamico.spinEscalaContagio.value() == \
+        sugestao["parametros"]["escala_contagio_m"]
+
+    # ---- fora da amostra (a mesma pasta como treino) e retomada
+    dialogo.linhaDinTreino.setText(pasta_din)
+    dialogo._fora_da_amostra()
+    assert "TESTE FORA DA AMOSTRA" in dialogo.textoLog.toPlainText(), erros
+    dialogo.abas.setCurrentWidget(dialogo.abaDinamico)
+    dialogo._executar()
+    _esperar(dialogo)
+    assert dialogo.lblStatus.text() == "Concluída (0 nesta sessão).", \
+        dialogo.lblStatus.text()
+    dialogo.close()
+    plugin.unload()
+
+
 def principal(pasta):
     espaco = {"__name__": "__console__"}
     caminho = os.path.join(RAIZ, "tools", "gerar_dados_teste.py")
@@ -213,6 +341,15 @@ def principal(pasta):
     _plugin(iface)
     _estatico(iface, pasta, K, mu0, mascara)
     _dinamico(iface, pasta, K, mu0, mascara, alertas, autos)
+
+    extras = _rasters_da_calibracao(pasta, dados)
+    camadas = dict(K=K, mu0=mu0, mascara=mascara, alertas=alertas,
+                   autos=autos)
+    for nome, caminho in extras.items():
+        camadas[nome] = QgsRasterLayer(caminho, nome)
+        assert camadas[nome].isValid(), nome
+        projeto.addMapLayer(camadas[nome])
+    _calibracao(_Iface(), pasta, camadas)
     print("DIALOGOS_OK")
 
 
