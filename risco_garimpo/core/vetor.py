@@ -34,6 +34,8 @@ def extrair_eventos(camada, campo_data, grade, filtro_data=None,
     """
     (QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject,
      QgsWkbTypes) = _importar_qgis()
+    from ..compat import tipo_geometria
+    tipo_ponto = tipo_geometria("Point")
 
     destino = QgsCoordinateReferenceSystem()
     destino.createFromWkt(grade.wkt)
@@ -64,7 +66,7 @@ def extrair_eventos(camada, campo_data, grade, filtro_data=None,
         if geom is None or geom.isEmpty():
             ignorados += 1
             continue
-        if QgsWkbTypes.geometryType(geom.wkbType()) == QgsWkbTypes.PointGeometry:
+        if QgsWkbTypes.geometryType(geom.wkbType()) == tipo_ponto:
             ponto = geom.asPoint() if not geom.isMultipart() else geom.asMultiPoint()[0]
         else:
             interno = geom.pointOnSurface()

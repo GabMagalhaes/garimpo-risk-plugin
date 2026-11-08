@@ -169,12 +169,15 @@ def construir():
         grupo("grupoRasters", "Rasters de entrada",
               [campo("combo", "comboK",
                      "K — capacidade de suporte (favorabilidade estática)",
-                     "Raster do modelo estático. K exclui μ: o garimpo "
-                     "pretérito entra no estado e no contágio, nunca em K."),
+                     "Raster do modelo estático. K exclui o garimpo "
+                     "mapeado: ele entra no estado e no contágio, nunca em "
+                     "K."),
                campo("combo", "comboMu0",
-                     "μ₀ — estado inicial (garimpo existente)",
-                     "Fração ocupada por pixel na data inicial, na mesma "
-                     "unidade de K."),
+                     "Mapa de garimpo (0/1) — data inicial",
+                     "Como vem do mapa anual (ex.: MapBiomas, só a classe "
+                     "de garimpo): 1 = garimpo, 0 = não. Não suavize: na "
+                     "grade de trabalho ele vira μ₀, a fração ocupada de "
+                     "cada pixel, e o contágio faz a vizinhança."),
                campo("combo", "comboMascara",
                      "Máscara da área de estudo (opcional)",
                      "Valores > 0 delimitam a área simulada.")],
@@ -193,7 +196,7 @@ def construir():
                      rotulo="Reamostrar a resolução de trabalho",
                      dica="Resoluções mais grossas aceleram e reduzem "
                           "memória, ao custo de resolver pior a escala "
-                          "de 380 m."),
+                          "de contágio (~100 m)."),
                campo("double", "spinResolucao", "Resolução de trabalho",
                      "Tamanho do pixel da simulação.",
                      decimais=1, minimo=1.0, maximo=5000.0, passo=10.0,
@@ -242,14 +245,17 @@ def construir():
         grupo("grupoCrescimento", "Crescimento e contágio",
               [campo("double", "spinR0", "r₀ — taxa intrínseca",
                      "Crescimento por dia sob contágio pleno e capacidade "
-                     "livre.",
-                     decimais=5, minimo=0.0, maximo=1.0, passo=0.001,
-                     valor=0.004, sufixo="dia⁻¹"),
+                     "livre. Padrão calibrado em 2020–2022 na APA do "
+                     "Tapajós (em 2022–2024, 0,00024): recalibre para o "
+                     "período.",
+                     decimais=5, minimo=0.0, maximo=1.0, passo=0.0001,
+                     valor=0.0007, sufixo="dia⁻¹"),
                campo("double", "spinEscalaContagio", "Escala de contágio",
-                     "Distância característica da propagação local "
-                     "(estimada em ~380 m).",
+                     "Distância característica da propagação local. "
+                     "Padrão calibrado na APA do Tapajós (100 m, o menor "
+                     "valor testado numa grade de 150 m).",
                      decimais=0, minimo=10.0, maximo=20000.0, passo=50.0,
-                     valor=380.0, sufixo="m"),
+                     valor=100.0, sufixo="m"),
                campo("combo", "comboKernel", "Núcleo de contágio",
                      itens=["exponencial", "gaussiano"]),
                campo("check", "checkExcluirCentro", "",

@@ -4,11 +4,11 @@
 import os
 
 from qgis.core import (QgsApplication, QgsCoordinateReferenceSystem,
-                       QgsProject, QgsRasterLayer, QgsVectorLayer,
-                       QgsWkbTypes)
+                       QgsProject, QgsRasterLayer, QgsVectorLayer)
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog, QMessageBox
 
+from .. import compat
 from ..core.execucao_estatica import (ConfiguracaoEstatica, caminhos_de_saida,
                                       escrever, grade_de_trabalho, preparar)
 from .tarefa_estatica import TarefaEstatica
@@ -64,7 +64,7 @@ class EstaticoDialog(QDialog, FORM_CLASS):
 
         poligonos = [c for c in QgsProject.instance().mapLayers().values()
                      if isinstance(c, QgsVectorLayer)
-                     and c.geometryType() == QgsWkbTypes.PolygonGeometry]
+                     and c.geometryType() == compat.tipo_geometria("Polygon")]
         poligonos.sort(key=lambda c: c.name().lower())
         self._preencher(self.comboSubbacias, poligonos, True)
 
@@ -270,6 +270,23 @@ class EstaticoDialog(QDialog, FORM_CLASS):
         self.btnCancelar.setEnabled(False)
         self.lblStatus.setText(status)
         self.tarefa = None
+
+    def aplicar_sugestao(self, sugestao):
+        """Pesos e γ sugeridos pela calibração; devolve o que mudou."""
+        alteracoes = []
+        for nome, spin in (("PGgeom", self.spinPesoIBx),
+                           ("Est", self.spinPesoEst),
+                           ("Lt", self.spinPesoLito)):
+            if nome in sugestao.get("pesos", {}):
+                spin.setValue(float(sugestao["pesos"][nome]))
+                alteracoes.append("peso de %s = %g" % (nome, spin.value()))
+        if sugestao.get("gama") is not None:
+            self.spinGamma.setValue(float(sugestao["gama"]))
+            alteracoes.append("γ = %g" % self.spinGamma.value())
+        else:
+            alteracoes.append("γ mantido (com uma evidência não faz "
+                              "diferença)")
+        return alteracoes
 
     def showEvent(self, evento):  # noqa: N802 - Qt
         super().showEvent(evento)

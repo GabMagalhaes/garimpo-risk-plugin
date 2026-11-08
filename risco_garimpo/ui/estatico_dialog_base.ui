@@ -17,7 +17,7 @@
 <layout class="QVBoxLayout" name="layoutv_grupoVariaveis">
 <item>
 <widget class="QLabel" name="nota_grupoVariaveis">
-<property name="text"><string>Variáveis de TERRENO apenas. O garimpo pretérito (μ) não entra aqui: ele calibra o nível, nunca a ordenação.</string></property>
+<property name="text"><string>Variáveis de TERRENO apenas. O garimpo mapeado não entra aqui: ele calibra o nível, nunca a ordenação.</string></property>
 <property name="wordWrap"><bool>true</bool></property>
 </widget>
 </item>
@@ -67,45 +67,45 @@
 </item>
 <item>
 <widget class="QGroupBox" name="grupoEstado">
-<property name="title"><string>Ocupação observada e recorte</string></property>
+<property name="title"><string>Mapas de garimpo (0/1) e recorte</string></property>
 <layout class="QVBoxLayout" name="layoutv_grupoEstado">
 <item>
 <layout class="QFormLayout" name="form_grupoEstado">
 <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
 <item row="0" column="0">
 <widget class="QLabel" name="lbl_comboMu">
-<property name="text"><string>μ — garimpo observado na data de referência</string></property>
+<property name="text"><string>Garimpo — ano de referência</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Usado para estimar o NÍVEL de saturação por classe de terreno. Não entra na ordenação.</string></property>
+<property name="toolTip"><string>Como vem do mapa anual (ex.: MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não. Não suavize: a ferramenta calcula a ocupação local (μ) na janela de ocupação. Estima o NÍVEL de saturação por classe de terreno; não entra na ordenação.</string></property>
 </widget>
 </item>
 <item row="0" column="1">
 <widget class="QComboBox" name="comboMu">
-<property name="toolTip"><string>Usado para estimar o NÍVEL de saturação por classe de terreno. Não entra na ordenação.</string></property>
+<property name="toolTip"><string>Como vem do mapa anual (ex.: MapBiomas, só a classe de garimpo): 1 = garimpo, 0 = não. Não suavize: a ferramenta calcula a ocupação local (μ) na janela de ocupação. Estima o NÍVEL de saturação por classe de terreno; não entra na ordenação.</string></property>
 </widget>
 </item>
 <item row="1" column="0">
 <widget class="QLabel" name="lbl_comboMuAntigo">
-<property name="text"><string>μ do ano mais antigo da série (maturidade)</string></property>
+<property name="text"><string>Garimpo — ano mais antigo</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Define quais pixels tiveram exposição longa ao processo. Sem exposição não há saturação observável.</string></property>
+<property name="toolTip"><string>Define a maturidade: pixels com garimpo deste ano na janela de ocupação tiveram exposição longa. Sem exposição não há saturação observável.</string></property>
 </widget>
 </item>
 <item row="1" column="1">
 <widget class="QComboBox" name="comboMuAntigo">
-<property name="toolTip"><string>Define quais pixels tiveram exposição longa ao processo. Sem exposição não há saturação observável.</string></property>
+<property name="toolTip"><string>Define a maturidade: pixels com garimpo deste ano na janela de ocupação tiveram exposição longa. Sem exposição não há saturação observável.</string></property>
 </widget>
 </item>
 <item row="2" column="0">
 <widget class="QLabel" name="lbl_comboMuAnterior">
-<property name="text"><string>μ do ano anterior (variação no último ano)</string></property>
+<property name="text"><string>Garimpo — ano anterior</string></property>
 <property name="wordWrap"><bool>true</bool></property>
-<property name="toolTip"><string>Usado só para a coluna de variação e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
+<property name="toolTip"><string>Usado só para a variação no último ano e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
 </widget>
 </item>
 <item row="2" column="1">
 <widget class="QComboBox" name="comboMuAnterior">
-<property name="toolTip"><string>Usado só para a coluna de variação e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
+<property name="toolTip"><string>Usado só para a variação no último ano e para projetar em quantos anos o remanescente se esgota no ritmo atual.</string></property>
 </widget>
 </item>
 <item row="3" column="0">

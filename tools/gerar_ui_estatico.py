@@ -35,20 +35,24 @@ def construir():
                      "Lt — favorabilidade litológica (opcional)",
                      "Prefira a litologia por pixel. Média por sub-bacia "
                      "dilui o sinal.")],
-              nota="Variáveis de TERRENO apenas. O garimpo pretérito (μ) "
-                   "não entra aqui: ele calibra o nível, nunca a ordenação."),
-        grupo("grupoEstado", "Ocupação observada e recorte",
+              nota="Variáveis de TERRENO apenas. O garimpo mapeado não "
+                   "entra aqui: ele calibra o nível, nunca a ordenação."),
+        grupo("grupoEstado", "Mapas de garimpo (0/1) e recorte",
               [campo("combo", "comboMu",
-                     "μ — garimpo observado na data de referência",
-                     "Usado para estimar o NÍVEL de saturação por classe de "
-                     "terreno. Não entra na ordenação."),
+                     "Garimpo — ano de referência",
+                     "Como vem do mapa anual (ex.: MapBiomas, só a classe "
+                     "de garimpo): 1 = garimpo, 0 = não. Não suavize: a "
+                     "ferramenta calcula a ocupação local (μ) na janela de "
+                     "ocupação. Estima o NÍVEL de saturação por classe de "
+                     "terreno; não entra na ordenação."),
                campo("combo", "comboMuAntigo",
-                     "μ do ano mais antigo da série (maturidade)",
-                     "Define quais pixels tiveram exposição longa ao "
-                     "processo. Sem exposição não há saturação observável."),
+                     "Garimpo — ano mais antigo",
+                     "Define a maturidade: pixels com garimpo deste ano na "
+                     "janela de ocupação tiveram exposição longa. Sem "
+                     "exposição não há saturação observável."),
                campo("combo", "comboMuAnterior",
-                     "μ do ano anterior (variação no último ano)",
-                     "Usado só para a coluna de variação e para projetar "
+                     "Garimpo — ano anterior",
+                     "Usado só para a variação no último ano e para projetar "
                      "em quantos anos o remanescente se esgota no ritmo "
                      "atual."),
                campo("combo", "comboMascara",

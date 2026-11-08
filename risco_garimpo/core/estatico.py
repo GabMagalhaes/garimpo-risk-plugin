@@ -105,11 +105,28 @@ def ocupacao_local(mu, pixel_m, janela_m=380.0):
     a escala de contágio estimada para a província.
     """
     mu = np.asarray(mu, dtype=np.float32)
-    raio = max(1, int(round(janela_m / (2.0 * float(pixel_m)))))
-    lado = 2 * raio + 1
+    lado = lado_da_janela(pixel_m, janela_m)
     nucleo = np.ones((lado, lado), dtype=np.float32)
     nucleo /= nucleo.sum()
     return np.clip(convolver(mu, nucleo), 0.0, 1.0).astype(np.float32)
+
+
+def lado_da_janela(pixel_m, janela_m=380.0):
+    """Lado da janela de ocupação, em pixels (ímpar; 13 a 30 m e 380 m)."""
+    return 2 * max(1, int(round(janela_m / (2.0 * float(pixel_m))))) + 1
+
+
+def maduros(mu_antigo, pixel_m, janela_m=380.0):
+    """Pixels de exposição longa: garimpo do mapa antigo na janela de ocupação.
+
+    Madura é a janela com ao menos meio pixel de garimpo antigo. Comparar a
+    ocupação local com zero não serve: a convolução por FFT deixa ruído da
+    ordem de 1e-7 onde não há garimpo nenhum, metade dele positivo, e cerca
+    de metade da área sairia madura. Um único pixel de garimpo na janela de
+    13 × 13 já vale 1/169 ≈ 0,006, muito acima do ruído.
+    """
+    lado = lado_da_janela(pixel_m, janela_m)
+    return ocupacao_local(mu_antigo, pixel_m, janela_m) >= 0.5 / lado ** 2
 
 
 def isotonica(y, peso=None):
@@ -196,6 +213,23 @@ def aplicar_nivel(escore, x, y):
 
 
 # ================================================================ orquestração
+class NivelDoEstrato(object):
+    """O que aconteceu com o nível de um estrato (ex.: leito de rio).
+
+    ``curva`` é a curva própria do estrato, ou ``None`` quando ele ficou
+    com a curva geral — ``motivo`` diz por quê. ``centros``,
+    ``saturacao`` e ``contagem`` são as faixas observadas no estrato,
+    quando houve pixel maduro para calculá-las.
+    """
+
+    def __init__(self, pixels, maduros):
+        self.pixels = pixels
+        self.maduros = maduros
+        self.centros = self.saturacao = self.contagem = None
+        self.curva = None
+        self.motivo = None
+
+
 class ResultadoEstatico(object):
     """K e o rastro de como ele foi produzido."""
 
@@ -250,21 +284,27 @@ def gerar_k(camadas, nomes, pesos, gamma, mu, pixel_m, maduro,
     x, y = curva_de_nivel(centros, saturacao, contagem)
     K = aplicar_nivel(escore, x, y)
 
+    # um estrato sem dados para a curva própria fica com a geral; o
+    # NivelDoEstrato registra isso, para que não passe em silêncio
     por_estrato = {}
     if estratos:
         for rotulo, mascara in estratos.items():
             m = np.asarray(mascara, dtype=bool)
-            if not (m & maduro).any():
+            nivel = NivelDoEstrato(int(m.sum()), int((m & maduro).sum()))
+            por_estrato[rotulo] = nivel
+            if not nivel.maduros:
+                nivel.motivo = "nenhum pixel maduro no estrato"
                 continue
             try:
-                c_e, s_e, n_e = saturacao_por_faixa(
-                    escore[m], ocupacao[m], maduro[m], n_faixas, quantil,
-                    minimo_por_faixa)
-                x_e, y_e = curva_de_nivel(c_e, s_e, n_e)
-            except ValueError:
+                nivel.centros, nivel.saturacao, nivel.contagem = \
+                    saturacao_por_faixa(escore[m], ocupacao[m], maduro[m],
+                                        n_faixas, quantil, minimo_por_faixa)
+                nivel.curva = curva_de_nivel(nivel.centros, nivel.saturacao,
+                                             nivel.contagem)
+            except ValueError as erro:
+                nivel.motivo = str(erro)
                 continue
-            por_estrato[rotulo] = (x_e, y_e)
-            K[m] = aplicar_nivel(escore[m], x_e, y_e)
+            K[m] = aplicar_nivel(escore[m], *nivel.curva)
 
     return ResultadoEstatico(K, escore, centros, saturacao, contagem, (x, y),
                              veto, float(y[-1]), por_estrato)

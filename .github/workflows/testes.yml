@@ -64,3 +64,28 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           EXIGIR_QGIS: "1"
         run: /usr/bin/python3 -m pytest tests -q
+
+  qgis4:
+    # O mesmo, no QGIS 4 (Qt6) do conda-forge: o Qt6 recusa nomes de enum
+    # que o Qt5 aceita, e só os diálogos de verdade mostram isso
+    runs-on: ubuntu-24.04
+    name: QGIS 4.2 do conda-forge (Qt6, ponta a ponta)
+    timeout-minutes: 40
+    defaults:
+      run:
+        # shell de login: ativa o ambiente, que põe o qgis no PYTHONPATH
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar QGIS 4
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: qgis4
+          create-args: >-
+            qgis=4.2 python=3.12 pytest scipy matplotlib-base
+          cache-environment: true
+      - name: Rodar testes
+        env:
+          QT_QPA_PLATFORM: offscreen
+          EXIGIR_QGIS: "1"
+        run: python -m pytest tests -q

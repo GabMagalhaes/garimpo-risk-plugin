@@ -213,6 +213,59 @@ def ler_alinhado(caminho, grade, reamostragem="bilinear", banda=1,
                          neginf=nodata_para).astype(np.float32)
 
 
+# ------------------------------------------------------------- mapa de garimpo
+# acima disto, o mapa de garimpo não parece um mapa 0/1
+LIMITE_INTERMEDIARIOS = 0.2
+
+
+def fracao_intermediaria(caminho, linhas=64, banda=1):
+    """Fração dos pixels com garimpo cujo valor fica entre 0 e 1.
+
+    Medida na resolução do próprio arquivo, em ``linhas`` linhas inteiras
+    espaçadas por igual: leitura sem reamostragem, que não passa pelas
+    pirâmides. Um mapa anual (0/1) dá 0; um mapa suavizado, perto de 1.
+    ``None`` quando as linhas lidas não têm garimpo.
+    """
+    _exigir_gdal()
+    ds = gdal.Open(caminho, gdal.GA_ReadOnly)
+    if ds is None:
+        raise IOError("não foi possível abrir o raster: %s" % caminho)
+    banda_ds = ds.GetRasterBand(int(banda))
+    nodata = banda_ds.GetNoDataValue()
+    com_garimpo = intermediarios = 0
+    for linha in np.unique(np.linspace(0, ds.RasterYSize - 1,
+                                       linhas).astype(int)):
+        valores = banda_ds.ReadAsArray(0, int(linha), ds.RasterXSize,
+                                       1).astype(np.float64)
+        validos = np.isfinite(valores)
+        if nodata is not None:
+            validos &= ~np.isclose(valores, nodata)
+        positivos = validos & (valores > 0)
+        com_garimpo += int(positivos.sum())
+        intermediarios += int((positivos & (valores < 1.0 - 1e-6)).sum())
+    ds = None
+    return intermediarios / float(com_garimpo) if com_garimpo else None
+
+
+def aviso_de_mapa(caminho, nome):
+    """Texto de aviso quando o mapa de garimpo não parece um mapa 0/1.
+
+    O mapa suavizado seria suavizado de novo: a ferramenta calcula a
+    vizinhança. ``None`` quando está tudo certo ou não deu para ler.
+    """
+    try:
+        fracao = fracao_intermediaria(caminho)
+    except Exception:  # noqa: BLE001 - o aviso é acessório
+        return None
+    if fracao is None or fracao <= LIMITE_INTERMEDIARIOS:
+        return None
+    return ("AVISO: no %s, %.0f%% dos pixels com garimpo têm valor entre 0 "
+            "e 1 na resolução do arquivo. O esperado é o mapa anual (0/1), "
+            "sem suavizar: a ferramenta já calcula a vizinhança. Se for um "
+            "mapa suavizado, troque pelo mapa 0/1; se for a fração de "
+            "garimpo em pixels maiores, pode seguir." % (nome, 100 * fracao))
+
+
 # ------------------------------------------------------------------ escrita
 def escrever_raster(caminho, arr, grade, nodata=-9999.0, mascara=None,
                     comprimir=True):
